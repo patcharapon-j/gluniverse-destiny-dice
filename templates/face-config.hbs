@@ -1,0 +1,45 @@
+<form class="glddf-face-config-form" autocomplete="off">
+  <p class="notes">{{reloadHint}}</p>
+
+  <div class="glddf-face-config-grid">
+    {{#each faces}}
+      <section class="glddf-face-config-row">
+        <div class="glddf-face-config-label">
+          <img class="glddf-face-config-preview" data-preview-face="{{face}}" {{#if image}}src="{{image}}"{{/if}} alt="" />
+          <strong>Face {{face}}</strong>
+        </div>
+
+        <label>
+          <span>Result</span>
+          <select name="face.{{face}}.kind">
+            {{#each kinds}}
+              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </label>
+
+        <label>
+          <span>Value</span>
+          <input type="number" name="face.{{face}}.bonus" value="{{bonus}}" step="1" />
+        </label>
+
+        <label class="glddf-face-config-image">
+          <span>PNG</span>
+          <div class="glddf-face-config-file">
+            <input type="text" name="face.{{face}}.image" value="{{image}}" />
+            <button type="button" data-action="browse-image" data-face="{{face}}" data-tooltip="Browse">
+              <i class="fa-solid fa-folder-open"></i>
+            </button>
+          </div>
+        </label>
+      </section>
+    {{/each}}
+  </div>
+
+  <footer class="sheet-footer flexrow">
+    <button type="submit">
+      <i class="fa-solid fa-save"></i>
+      Save
+    </button>
+  </footer>
+</form>

@@ -1,0 +1,51 @@
+{
+  "id": "gluniverse-destiny-dice",
+  "title": "GLUniverse Destiny Dice",
+  "description": "Adds Aegis Fallen Fate Die support to PF2e checks, Hero Point rerolls, chat cards, and Dice So Nice.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "authors": [
+    {
+      "name": "GLUniverse"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.mjs"
+  ],
+  "styles": [
+    "styles/destiny-dice.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "pf2e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "7.0.0"
+        }
+      }
+    ],
+    "recommends": [
+      {
+        "id": "dice-so-nice",
+        "type": "module"
+      }
+    ]
+  },
+  "url": "https://github.com/patcharapon-j/gluniverse-destiny-dice",
+  "manifest": "https://github.com/patcharapon-j/gluniverse-destiny-dice/releases/latest/download/module.json",
+  "download": "https://github.com/patcharapon-j/gluniverse-destiny-dice/releases/latest/download/module.zip",
+  "bugs": "https://github.com/patcharapon-j/gluniverse-destiny-dice/issues",
+  "readme": "https://github.com/patcharapon-j/gluniverse-destiny-dice/blob/main/README.md",
+  "license": "MIT"
+}
