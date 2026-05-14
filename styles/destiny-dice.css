@@ -103,50 +103,38 @@
   --glddf-rail: rgba(255, 255, 255, 0.2);
   --glddf-rail-glow: rgba(255, 255, 255, 0.18);
   --glddf-tint: rgba(255, 255, 255, 0.04);
-  --glddf-edge: rgba(255, 255, 255, 0.06);
+  --glddf-edge: rgba(255, 255, 255, 0.08);
+  --glddf-leading-size: 3rem;
 
-  align-items: center;
+  align-items: stretch;
   border: 1px solid var(--glddf-edge);
-  border-radius: 6px;
+  border-radius: 8px;
   color: #ece4ca;
   display: flex;
-  font-size: 0.78rem;
-  gap: 0.6rem;
+  font-size: 0.82rem;
+  gap: 0;
   isolation: isolate;
-  letter-spacing: 0.04em;
-  margin: 6px 0 2px;
+  letter-spacing: 0.05em;
+  margin: 8px 0 4px;
+  min-height: var(--glddf-leading-size);
   overflow: hidden;
-  padding: 0.42rem 0.85rem 0.42rem 0.95rem;
+  padding: 0;
   position: relative;
   text-transform: uppercase;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 28%),
-    radial-gradient(ellipse at 0% 50%, var(--glddf-tint), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 30%),
+    radial-gradient(ellipse at 0% 50%, var(--glddf-tint), transparent 65%),
     linear-gradient(135deg, #1d1f29 0%, #15161f 55%, #0e0f17 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    0 1px 0 rgba(255, 255, 255, 0.025),
-    0 6px 14px rgba(0, 0, 0, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.55);
-}
-
-.glddf-fate-strip::before {
-  background: var(--glddf-rail);
-  bottom: 0;
-  box-shadow:
-    0 0 6px var(--glddf-rail),
-    0 0 14px var(--glddf-rail-glow);
-  content: "";
-  left: 0;
-  position: absolute;
-  top: 0;
-  width: 3px;
-  z-index: 1;
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 18px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .glddf-fate-strip::after {
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.04) 35%, transparent 70%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.05) 35%, transparent 75%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -159,27 +147,27 @@
   z-index: 2;
 }
 
-.glddf-fate-strip.glddf-tyranny {
+.glddf-fate-strip.glddf-complication {
   --glddf-rail: #f5c455;
-  --glddf-rail-glow: rgba(245, 196, 85, 0.45);
-  --glddf-tint: rgba(255, 195, 80, 0.2);
-  --glddf-edge: rgba(245, 196, 85, 0.32);
+  --glddf-rail-glow: rgba(245, 196, 85, 0.5);
+  --glddf-tint: rgba(255, 195, 80, 0.22);
+  --glddf-edge: rgba(245, 196, 85, 0.36);
   background:
-    linear-gradient(180deg, rgba(255, 220, 130, 0.1), transparent 28%),
-    radial-gradient(ellipse at 0% 50%, rgba(255, 195, 80, 0.22), transparent 60%),
-    linear-gradient(135deg, #2c220e 0%, #1a160a 55%, #120f08 100%);
+    linear-gradient(180deg, rgba(255, 220, 130, 0.12), transparent 30%),
+    radial-gradient(ellipse at 0% 50%, rgba(255, 195, 80, 0.24), transparent 65%),
+    linear-gradient(135deg, #2e230f 0%, #1a160a 55%, #100d07 100%);
   color: #f8e4a0;
 }
 
-.glddf-fate-strip.glddf-defiance {
+.glddf-fate-strip.glddf-opportunity {
   --glddf-rail: #ff5a4a;
-  --glddf-rail-glow: rgba(255, 90, 74, 0.5);
-  --glddf-tint: rgba(255, 80, 60, 0.22);
-  --glddf-edge: rgba(255, 90, 74, 0.32);
+  --glddf-rail-glow: rgba(255, 90, 74, 0.55);
+  --glddf-tint: rgba(255, 80, 60, 0.24);
+  --glddf-edge: rgba(255, 90, 74, 0.36);
   background:
-    linear-gradient(180deg, rgba(255, 130, 110, 0.1), transparent 28%),
-    radial-gradient(ellipse at 0% 50%, rgba(255, 80, 60, 0.22), transparent 60%),
-    linear-gradient(135deg, #2e120e 0%, #1a0908 55%, #120605 100%);
+    linear-gradient(180deg, rgba(255, 130, 110, 0.12), transparent 30%),
+    radial-gradient(ellipse at 0% 50%, rgba(255, 80, 60, 0.24), transparent 65%),
+    linear-gradient(135deg, #2e120e 0%, #1a0908 55%, #100605 100%);
   color: #ffbeb0;
 }
 
@@ -187,7 +175,7 @@
   --glddf-rail: rgba(220, 220, 220, 0.6);
   --glddf-rail-glow: rgba(220, 220, 220, 0.22);
   --glddf-tint: rgba(255, 255, 255, 0.04);
-  --glddf-edge: rgba(160, 160, 170, 0.22);
+  --glddf-edge: rgba(160, 160, 170, 0.26);
   color: #cbcbd2;
 }
 
@@ -195,68 +183,123 @@
   filter: saturate(0.55) brightness(0.82);
 }
 
+/* Leading icon — flush to left, top, and bottom of the bar. */
+.glddf-fate-face,
+.glddf-fate-glyph {
+  align-self: stretch;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(255, 255, 255, 0.06), transparent 60%),
+    rgba(0, 0, 0, 0.32);
+  border: none;
+  border-right: 1px solid var(--glddf-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset -1px 0 0 rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex: 0 0 var(--glddf-leading-size);
+  height: auto;
+  margin: 0;
+  position: relative;
+  width: var(--glddf-leading-size);
+}
+
+.glddf-fate-face {
+  object-fit: cover;
+  padding: 0.2rem;
+  filter:
+    drop-shadow(0 0 6px var(--glddf-rail-glow, transparent))
+    drop-shadow(0 0 12px var(--glddf-rail-glow, transparent))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.65));
+}
+
 .glddf-fate-glyph {
   align-items: center;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.18), transparent 60%),
-    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.4), transparent 65%);
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.45),
-    0 0 6px var(--glddf-rail-glow, transparent),
-    0 1px 2px rgba(0, 0, 0, 0.5);
-  display: inline-grid;
-  flex: 0 0 1.55rem;
-  height: 1.55rem;
-  justify-items: center;
-  position: relative;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(0, 0, 0, 0.5);
-  width: 1.55rem;
+  justify-content: center;
+  text-shadow: 0 0 6px var(--glddf-rail-glow, transparent), 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .glddf-fate-glyph i {
-  font-size: 0.92rem;
+  font-size: 1.15rem;
   line-height: 1;
   opacity: 0.95;
 }
 
-.glddf-fate-face {
-  border: none;
-  display: block;
-  flex: 0 0 1.7rem;
-  height: 1.7rem;
-  object-fit: contain;
-  width: 1.7rem;
-  filter:
-    drop-shadow(0 0 6px var(--glddf-rail-glow, transparent))
-    drop-shadow(0 0 12px var(--glddf-rail-glow, transparent))
-    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
-  background: transparent;
+.glddf-fate-body {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.5rem 0.95rem;
+  position: relative;
+}
+
+/* Colored rail accent sits between the leading icon and the text body. */
+.glddf-fate-body::before {
+  background: var(--glddf-rail);
+  bottom: 0.32rem;
+  box-shadow:
+    0 0 6px var(--glddf-rail),
+    0 0 14px var(--glddf-rail-glow);
+  content: "";
+  left: 0;
+  position: absolute;
+  top: 0.32rem;
+  width: 2px;
+  z-index: 1;
+}
+
+.glddf-fate-body > * {
+  position: relative;
+  z-index: 2;
 }
 
 .glddf-fate-name {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-shadow:
     0 0 8px var(--glddf-tint, transparent),
-    0 1px 0 rgba(0, 0, 0, 0.5);
+    0 1px 0 rgba(0, 0, 0, 0.55);
 }
 
 .glddf-fate-bonus {
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.12), transparent 70%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
+  border: 1px solid var(--glddf-rail);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 0 8px var(--glddf-rail-glow, transparent),
+    0 0 18px var(--glddf-rail-glow, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  display: inline-flex;
   font-family: var(--font-primary);
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0;
+  font-size: 1.45rem;
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0.01em;
   line-height: 1;
   margin-left: auto;
+  min-width: 2.5rem;
+  padding: 0.18rem 0.7rem 0.22rem;
   text-shadow:
-    0 0 8px var(--glddf-rail-glow, transparent),
-    0 0 16px var(--glddf-rail-glow, transparent),
-    0 1px 1px rgba(0, 0, 0, 0.65);
+    0 0 6px var(--glddf-rail),
+    0 0 12px var(--glddf-rail-glow, transparent),
+    0 1px 1px rgba(0, 0, 0, 0.8);
   text-transform: none;
+}
+
+.glddf-fate-strip.glddf-complication .glddf-fate-bonus {
+  color: #fff4cf;
+}
+
+.glddf-fate-strip.glddf-opportunity .glddf-fate-bonus {
+  color: #ffd9d0;
 }
 
 .glddf-face-config-form {

@@ -1,5 +1,5 @@
-import { FATE_DIE_DENOMINATION, FATE_DIE_NOTATION } from "./constants.mjs";
-import { getFateFace, getKindLabel } from "./settings.mjs";
+import { FATE_DIE_DENOMINATION, FATE_DIE_NOTATION, KIND_OPPORTUNITY } from "./constants.mjs";
+import { getFateFace, getKindLabel, normalizeKind } from "./settings.mjs";
 
 export class DestinyFateDie extends foundry.dice.terms.Die {
   constructor(termData = {}) {
@@ -11,8 +11,10 @@ export class DestinyFateDie extends foundry.dice.terms.Die {
   getResultLabel(result) {
     const face = getFateFace(result.result);
     if (!face) return String(result.result);
-    const kindLabel = getKindLabel(face.kind);
-    return face.bonus !== 0 ? `${kindLabel} ${formatSignedNumber(face.bonus)}` : kindLabel;
+    const kind = normalizeKind(face.kind);
+    const kindLabel = getKindLabel(kind);
+    const showBonus = kind !== KIND_OPPORTUNITY && face.bonus !== 0;
+    return showBonus ? `${kindLabel} ${formatSignedNumber(face.bonus)}` : kindLabel;
   }
 }
 

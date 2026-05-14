@@ -1,5 +1,5 @@
-import { FATE_DIE_DENOMINATION, FATE_DIE_NOTATION, FLAGS, MODULE_ID } from "./constants.mjs";
-import { getFaceImagePaths, getFateFace, getKindLabel } from "./settings.mjs";
+import { FATE_DIE_DENOMINATION, FATE_DIE_NOTATION, FLAGS, KIND_OPPORTUNITY, MODULE_ID } from "./constants.mjs";
+import { getFaceImagePaths, getFateFace, getKindLabel, normalizeKind } from "./settings.mjs";
 
 const inFlightFateRolls = new Set();
 const FATE_STRIP_PATTERN = /<(footer|section)\b[^>]*class="[^"]*glddf-fate-(?:strip|result)[^"]*"[^>]*>[\s\S]*?<\/\1>\s*/gi;
@@ -37,7 +37,7 @@ export async function applyFateToMessage(message, { source = "manual" } = {}) {
     const fate = {
       source,
       face: face.value,
-      kind: face.kind,
+      kind: normalizeKind(face.kind),
       bonus: face.bonus,
       accepted: null,
       roll: roll.toJSON(),
@@ -83,14 +83,18 @@ function getFaceResult(roll) {
 }
 
 function renderFateBar(fate) {
-  const kindLabel = getKindLabel(fate.kind);
-  const classes = ["glddf-fate-strip", `glddf-${fate.kind}`, fate.accepted === false ? "glddf-refused" : ""].filter(Boolean).join(" ");
-  const bonusBadge = fate.bonus !== 0 ? `<span class="glddf-fate-bonus">${formatSignedNumber(fate.bonus)}</span>` : "";
+  const kind = normalizeKind(fate.kind);
+  const kindLabel = getKindLabel(kind);
+  const classes = ["glddf-fate-strip", `glddf-${kind}`, fate.accepted === false ? "glddf-refused" : ""].filter(Boolean).join(" ");
+  const showBonus = kind !== KIND_OPPORTUNITY && fate.bonus !== 0;
+  const bonusBadge = showBonus ? `<span class="glddf-fate-bonus">${formatSignedNumber(fate.bonus)}</span>` : "";
 
   return `<footer class="${classes}" data-fate-face="${fate.face}">
     ${renderGlyph(fate)}
-    <span class="glddf-fate-name">${kindLabel}</span>
-    ${bonusBadge}
+    <div class="glddf-fate-body">
+      <span class="glddf-fate-name">${kindLabel}</span>
+      ${bonusBadge}
+    </div>
   </footer>`;
 }
 

@@ -1,66 +1,67 @@
-import { DEFAULT_FATE_FACES, FACE_NUMBERS, MODULE_ID } from "./constants.mjs";
+import {
+  FACE_NUMBERS,
+  FATE_KINDS,
+  FATE_PRESETS,
+  KIND_ALIASES,
+  KIND_BLANK,
+  KIND_OPPORTUNITY,
+  MODULE_ID,
+  PRESET_AEGIS_FALLEN,
+  PRESET_DEFAULT,
+  PRESET_FATE_FACES,
+  PRESET_TIDES_OF_DESTINY,
+} from "./constants.mjs";
 
 export const SETTINGS = {
-  tyrannyLabel: "tyrannyLabel",
-  defianceLabel: "defianceLabel",
-  blankLabel: "blankLabel",
-  tyrannyColor: "tyrannyColor",
-  defianceColor: "defianceColor",
-  blankColor: "blankColor",
-  face1Image: "face1Image",
-  face2Image: "face2Image",
-  face5Image: "face5Image",
-  face6Image: "face6Image",
+  preset: "preset",
+  emissiveIntensity: "emissiveIntensity",
 };
+
+export const EMISSIVE_INTENSITY_DEFAULT = 1.0;
+export const EMISSIVE_INTENSITY_MIN = 0;
+export const EMISSIVE_INTENSITY_MAX = 2;
+export const EMISSIVE_INTENSITY_STEP = 0.05;
 
 for (const face of FACE_NUMBERS) {
   SETTINGS[`face${face}Kind`] = `face${face}Kind`;
   SETTINGS[`face${face}Bonus`] = `face${face}Bonus`;
-  SETTINGS[`face${face}Image`] ??= `face${face}Image`;
+  SETTINGS[`face${face}Image`] = `face${face}Image`;
 }
 
-const FACE_TO_SETTING = {
-  1: SETTINGS.face1Image,
-  2: SETTINGS.face2Image,
-  3: SETTINGS.face3Image,
-  4: SETTINGS.face4Image,
-  5: SETTINGS.face5Image,
-  6: SETTINGS.face6Image,
+// Map old loose filenames the previous version stored to a current asset path.
+const LEGACY_FACE_IMAGE_PATHS = {
+  "tyranny-4": PRESET_FATE_FACES[PRESET_DEFAULT][1].image,
+  "tyranny-2": PRESET_FATE_FACES[PRESET_DEFAULT][2].image,
+  defiance: PRESET_FATE_FACES[PRESET_DEFAULT][5].image,
+  "defiance-2": PRESET_FATE_FACES[PRESET_DEFAULT][5].image,
 };
 
-const LEGACY_FACE_IMAGE_PATHS = {
-  "tyranny-4": DEFAULT_FATE_FACES[1].image,
-  "tyranny-2": DEFAULT_FATE_FACES[2].image,
-  defiance: DEFAULT_FATE_FACES[5].image,
-  "defiance-2": DEFAULT_FATE_FACES[6].image,
+// Set of paths that are "built-in" defaults for any preset — used to decide
+// whether a stored image setting is a customization or just an old default.
+const BUILTIN_IMAGE_PATHS = new Set();
+for (const preset of Object.values(PRESET_FATE_FACES)) {
+  for (const face of Object.values(preset)) {
+    if (face.image) BUILTIN_IMAGE_PATHS.add(face.image);
+  }
+}
+// Historical default paths that no longer exist as current preset defaults but
+// were shipped by earlier module versions; migration treats them the same as
+// current built-ins (clear → follow active preset).
+BUILTIN_IMAGE_PATHS.add(`modules/${MODULE_ID}/assets/dice/defiance-2.png`);
+
+const PRESET_CHOICES = {
+  [PRESET_DEFAULT]: "GLDDF.Settings.Preset.Default",
+  [PRESET_AEGIS_FALLEN]: "GLDDF.Settings.Preset.AegisFallen",
+  [PRESET_TIDES_OF_DESTINY]: "GLDDF.Settings.Preset.TidesOfDestiny",
 };
 
 const FATE_KIND_CHOICES = {
-  tyranny: "GLDDF.Fate.Kind.tyranny",
-  defiance: "GLDDF.Fate.Kind.defiance",
+  opportunity: "GLDDF.Fate.Kind.opportunity",
+  complication: "GLDDF.Fate.Kind.complication",
   blank: "GLDDF.Fate.Kind.blank",
 };
 
-const KIND_TO_LABEL_SETTING = {
-  tyranny: SETTINGS.tyrannyLabel,
-  defiance: SETTINGS.defianceLabel,
-  blank: SETTINGS.blankLabel,
-};
-
-const KIND_TO_COLOR_SETTING = {
-  tyranny: SETTINGS.tyrannyColor,
-  defiance: SETTINGS.defianceColor,
-  blank: SETTINGS.blankColor,
-};
-
-const DEFAULT_COLORS = {
-  tyranny: "#f5c455",
-  defiance: "#ff5a4a",
-  blank: "#dcdcdc",
-};
-
 const FACE_CONFIG_TEMPLATE = `modules/${MODULE_ID}/templates/face-config.hbs`;
-const HEX_PATTERN = /^#?[0-9a-f]{6}$/i;
 
 export function registerSettings() {
   const reg = (key, opts) => game.settings.register(MODULE_ID, key, {
@@ -69,48 +70,27 @@ export function registerSettings() {
     ...opts,
   });
 
-  reg(SETTINGS.tyrannyLabel, {
-    name: "GLDDF.Settings.TyrannyLabel.Name",
-    hint: "GLDDF.Settings.TyrannyLabel.Hint",
+  reg(SETTINGS.preset, {
+    name: "GLDDF.Settings.Preset.Name",
+    hint: "GLDDF.Settings.Preset.Hint",
     type: String,
-    default: "Tyranny",
-    onChange: applyThemeFromSettings,
-  });
-  reg(SETTINGS.defianceLabel, {
-    name: "GLDDF.Settings.DefianceLabel.Name",
-    hint: "GLDDF.Settings.DefianceLabel.Hint",
-    type: String,
-    default: "Defiance",
-    onChange: applyThemeFromSettings,
-  });
-  reg(SETTINGS.blankLabel, {
-    name: "GLDDF.Settings.BlankLabel.Name",
-    hint: "GLDDF.Settings.BlankLabel.Hint",
-    type: String,
-    default: "Blank",
+    choices: PRESET_CHOICES,
+    default: PRESET_DEFAULT,
+    requiresReload: true,
     onChange: applyThemeFromSettings,
   });
 
-  reg(SETTINGS.tyrannyColor, {
-    name: "GLDDF.Settings.TyrannyColor.Name",
-    hint: "GLDDF.Settings.TyrannyColor.Hint",
-    type: String,
-    default: DEFAULT_COLORS.tyranny,
-    onChange: applyThemeFromSettings,
-  });
-  reg(SETTINGS.defianceColor, {
-    name: "GLDDF.Settings.DefianceColor.Name",
-    hint: "GLDDF.Settings.DefianceColor.Hint",
-    type: String,
-    default: DEFAULT_COLORS.defiance,
-    onChange: applyThemeFromSettings,
-  });
-  reg(SETTINGS.blankColor, {
-    name: "GLDDF.Settings.BlankColor.Name",
-    hint: "GLDDF.Settings.BlankColor.Hint",
-    type: String,
-    default: DEFAULT_COLORS.blank,
-    onChange: applyThemeFromSettings,
+  reg(SETTINGS.emissiveIntensity, {
+    name: "GLDDF.Settings.EmissiveIntensity.Name",
+    hint: "GLDDF.Settings.EmissiveIntensity.Hint",
+    type: Number,
+    range: {
+      min: EMISSIVE_INTENSITY_MIN,
+      max: EMISSIVE_INTENSITY_MAX,
+      step: EMISSIVE_INTENSITY_STEP,
+    },
+    default: EMISSIVE_INTENSITY_DEFAULT,
+    requiresReload: true,
   });
 
   game.settings.registerMenu(MODULE_ID, "faceConfig", {
@@ -123,27 +103,21 @@ export function registerSettings() {
   });
 
   for (const face of FACE_NUMBERS) {
-    const defaults = DEFAULT_FATE_FACES[face];
+    const defaults = PRESET_FATE_FACES[PRESET_DEFAULT][face];
     reg(getFaceKindSetting(face), {
-      name: `Face ${face} Result`,
-      hint: `Controls whether face ${face} counts as Tyranny, Defiance, or Blank.`,
       type: String,
       choices: FATE_KIND_CHOICES,
       default: defaults.kind,
       config: false,
     });
     reg(getFaceBonusSetting(face), {
-      name: `Face ${face} Value`,
-      hint: `Numeric value shown with face ${face}. Use 0 for no value.`,
       type: Number,
       default: defaults.bonus,
       config: false,
     });
     reg(getFaceImageSetting(face), {
-      name: `Face ${face} PNG`,
-      hint: `PNG image for face ${face}.`,
       type: String,
-      default: defaults.image,
+      default: "",
       filePicker: "image",
       requiresReload: true,
       config: false,
@@ -155,35 +129,81 @@ export function getSetting(key) {
   return game.settings.get(MODULE_ID, key);
 }
 
+export function normalizeKind(kind) {
+  if (typeof kind !== "string") return KIND_BLANK;
+  const aliased = KIND_ALIASES[kind] ?? kind;
+  return FATE_KINDS.includes(aliased) ? aliased : KIND_BLANK;
+}
+
+export function getActivePresetId() {
+  const value = getSetting(SETTINGS.preset);
+  return FATE_PRESETS[value] ? value : PRESET_DEFAULT;
+}
+
+export function getEmissiveIntensity() {
+  const raw = Number(getSetting(SETTINGS.emissiveIntensity));
+  if (!Number.isFinite(raw)) return EMISSIVE_INTENSITY_DEFAULT;
+  return Math.min(EMISSIVE_INTENSITY_MAX, Math.max(EMISSIVE_INTENSITY_MIN, raw));
+}
+
+export function getActivePreset() {
+  return FATE_PRESETS[getActivePresetId()];
+}
+
+function getPresetFace(face) {
+  const presetId = getActivePresetId();
+  return PRESET_FATE_FACES[presetId]?.[face] ?? PRESET_FATE_FACES[PRESET_DEFAULT][face];
+}
+
 export async function migrateLegacySettings() {
   if (!game.user?.isGM) return;
   for (const face of FACE_NUMBERS) {
-    const setting = getFaceImageSetting(face);
-    const value = getSetting(setting);
-    const migrated = normalizeImagePath(value);
-    if (migrated && migrated !== value) await game.settings.set(MODULE_ID, setting, migrated);
+    const imageSetting = getFaceImageSetting(face);
+    const rawImage = getSetting(imageSetting);
+    const migratedImage = normalizeImagePath(rawImage);
+
+    // Clear stored image if it matches any built-in preset default — the
+    // resolved path now comes from the active preset.
+    if (migratedImage && BUILTIN_IMAGE_PATHS.has(migratedImage)) {
+      if (rawImage !== "") await game.settings.set(MODULE_ID, imageSetting, "");
+    } else if (migratedImage !== rawImage) {
+      await game.settings.set(MODULE_ID, imageSetting, migratedImage);
+    }
+
+    const kindSetting = getFaceKindSetting(face);
+    const kindValue = getSetting(kindSetting);
+    const migratedKind = KIND_ALIASES[kindValue];
+    if (migratedKind && migratedKind !== kindValue) {
+      await game.settings.set(MODULE_ID, kindSetting, migratedKind);
+    }
+
+    // Opportunity faces no longer carry numeric bonuses.
+    const resolvedKind = normalizeKind(getSetting(kindSetting));
+    if (resolvedKind === KIND_OPPORTUNITY) {
+      const bonusSetting = getFaceBonusSetting(face);
+      if (Number(getSetting(bonusSetting)) !== 0) {
+        await game.settings.set(MODULE_ID, bonusSetting, 0);
+      }
+    }
   }
 }
 
 export function getKindLabel(kind) {
-  const setting = KIND_TO_LABEL_SETTING[kind];
-  if (!setting) return kind;
-  const value = getSetting(setting);
-  return typeof value === "string" && value.trim() ? value : kind;
+  const normalized = normalizeKind(kind);
+  return getActivePreset().labels[normalized] ?? normalized;
 }
 
 export function getKindColor(kind) {
-  const setting = KIND_TO_COLOR_SETTING[kind];
-  return normalizeHex(setting ? getSetting(setting) : null, DEFAULT_COLORS[kind] ?? "#cccccc");
+  const normalized = normalizeKind(kind);
+  return getActivePreset().colors[normalized] ?? "#cccccc";
 }
 
 export function getFateFace(face) {
   if (!FACE_NUMBERS.includes(face)) return null;
-  const defaults = DEFAULT_FATE_FACES[face];
-  return {
-    kind: getFaceKind(face, defaults.kind),
-    bonus: getFaceBonus(face, defaults.bonus),
-  };
+  const defaults = getPresetFace(face);
+  const kind = getFaceKind(face, defaults.kind);
+  const bonus = kind === KIND_OPPORTUNITY ? 0 : getFaceBonus(face, defaults.bonus);
+  return { kind, bonus };
 }
 
 export function getConfiguredFateFaces() {
@@ -191,24 +211,39 @@ export function getConfiguredFateFaces() {
 }
 
 export function getFaceImagePath(face) {
-  const setting = FACE_TO_SETTING[face];
-  return normalizeImagePath(setting ? getSetting(setting) : null);
+  const stored = normalizeImagePath(getSetting(getFaceImageSetting(face)));
+  if (stored) return stored;
+  return getPresetFace(face)?.image ?? "";
 }
 
 export function getFaceImagePaths(face) {
-  const image = getFaceImagePath(face);
-  if (!image) return null;
-  const companion = getCompanionImagePaths(image);
+  const stored = normalizeImagePath(getSetting(getFaceImageSetting(face)));
+  if (stored) {
+    const builtIn = findBuiltInFace(stored);
+    if (builtIn) return { image: builtIn.image, bump: builtIn.bump, emissive: builtIn.emissive };
+    const root = stored.replace(/\.png$/i, "");
+    return { image: stored, bump: `${root}-bump.png`, emissive: `${root}-emissive.png` };
+  }
+  const presetFace = getPresetFace(face);
+  if (!presetFace?.image) return null;
   return {
-    image,
-    bump: companion?.bump ?? image,
-    emissive: companion?.emissive ?? image,
+    image: presetFace.image,
+    bump: presetFace.bump || presetFace.image,
+    emissive: presetFace.emissive || presetFace.image,
   };
 }
 
+function findBuiltInFace(image) {
+  for (const preset of Object.values(PRESET_FATE_FACES)) {
+    for (const face of Object.values(preset)) {
+      if (face.image === image) return face;
+    }
+  }
+  return null;
+}
+
 function getFaceKind(face, fallback) {
-  const value = getSetting(getFaceKindSetting(face));
-  return Object.prototype.hasOwnProperty.call(FATE_KIND_CHOICES, value) ? value : fallback;
+  return normalizeKind(getSetting(getFaceKindSetting(face))) || fallback;
 }
 
 function getFaceBonus(face, fallback) {
@@ -235,16 +270,6 @@ function normalizeImagePath(value) {
   return LEGACY_FACE_IMAGE_PATHS[trimmed] ?? trimmed;
 }
 
-function getCompanionImagePaths(image) {
-  const builtInEntry = Object.values(LEGACY_FACE_IMAGE_PATHS).includes(image);
-  if (!builtInEntry) return null;
-  const root = image.replace(/\.png$/i, "");
-  return {
-    bump: `${root}-bump.png`,
-    emissive: `${root}-emissive.png`,
-  };
-}
-
 class DestinyFaceConfig extends FormApplication {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -268,12 +293,17 @@ class DestinyFaceConfig extends FormApplication {
       reloadHint: game.i18n.localize("GLDDF.Settings.FaceConfig.ReloadHint"),
       faces: FACE_NUMBERS.map((face) => {
         const fateFace = getFateFace(face);
-        const image = getFaceImagePath(face);
+        const storedImage = normalizeImagePath(getSetting(getFaceImageSetting(face)));
+        const resolvedImage = getFaceImagePath(face);
+        const isOpportunity = fateFace.kind === KIND_OPPORTUNITY;
         return {
           face,
           kind: fateFace.kind,
           bonus: fateFace.bonus,
-          image,
+          bonusReadOnly: isOpportunity,
+          image: storedImage,
+          previewImage: resolvedImage,
+          imagePlaceholder: getPresetFace(face)?.image ?? "",
           kinds: kinds.map((kind) => ({ ...kind, selected: kind.value === fateFace.kind })),
         };
       }),
@@ -303,32 +333,28 @@ class DestinyFaceConfig extends FormApplication {
     const expanded = foundry.utils.expandObject(formData);
     for (const face of FACE_NUMBERS) {
       const data = expanded.face?.[face] ?? {};
-      await game.settings.set(MODULE_ID, getFaceKindSetting(face), data.kind ?? DEFAULT_FATE_FACES[face].kind);
-      await game.settings.set(MODULE_ID, getFaceBonusSetting(face), Number(data.bonus) || 0);
+      const defaults = PRESET_FATE_FACES[PRESET_DEFAULT][face];
+      const kind = normalizeKind(data.kind) || defaults.kind;
+      const bonus = kind === KIND_OPPORTUNITY ? 0 : (Number(data.bonus) || 0);
+      await game.settings.set(MODULE_ID, getFaceKindSetting(face), kind);
+      await game.settings.set(MODULE_ID, getFaceBonusSetting(face), bonus);
       await game.settings.set(MODULE_ID, getFaceImageSetting(face), normalizeImagePath(data.image));
     }
     ui.notifications?.info(game.i18n.localize("GLDDF.Settings.FaceConfig.Saved"));
   }
 }
 
-function normalizeHex(value, fallback) {
-  if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
-  if (!HEX_PATTERN.test(trimmed)) return fallback;
-  return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
-}
-
 export function applyThemeFromSettings() {
   if (typeof document === "undefined") return;
-  const tyranny = getKindColor("tyranny");
-  const defiance = getKindColor("defiance");
+  const opportunity = getKindColor("opportunity");
+  const complication = getKindColor("complication");
   const blank = getKindColor("blank");
 
   const css = [
-    themeStripRule(".glddf-fate-strip.glddf-tyranny", tyranny),
-    themeStripRule(".glddf-fate-strip.glddf-defiance", defiance),
+    themeStripRule(".glddf-fate-strip.glddf-opportunity", opportunity),
+    themeStripRule(".glddf-fate-strip.glddf-complication", complication),
     themeStripRule(".glddf-fate-strip.glddf-blank", blank),
-    themeToggleRule(tyranny),
+    themeToggleRule(complication),
   ].join("\n");
 
   let style = document.getElementById("glddf-theme-overrides");
