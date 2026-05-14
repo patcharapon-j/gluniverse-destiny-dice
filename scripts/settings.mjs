@@ -47,7 +47,9 @@ for (const preset of Object.values(PRESET_FATE_FACES)) {
 // Historical default paths that no longer exist as current preset defaults but
 // were shipped by earlier module versions; migration treats them the same as
 // current built-ins (clear → follow active preset).
-BUILTIN_IMAGE_PATHS.add(`modules/${MODULE_ID}/assets/dice/defiance-2.png`);
+for (const legacy of ["defiance.png", "defiance-2.png", "tyranny-2.png", "tyranny-4.png"]) {
+  BUILTIN_IMAGE_PATHS.add(`modules/${MODULE_ID}/assets/dice/${legacy}`);
+}
 
 const PRESET_CHOICES = {
   [PRESET_DEFAULT]: "GLDDF.Settings.Preset.Default",

@@ -45,12 +45,12 @@ function faceAsset(folder, base) {
 // Opportunity faces carry no numeric bonus — only Complication faces do.
 export const PRESET_FATE_FACES = {
   [PRESET_DEFAULT]: {
-    1: { kind: KIND_COMPLICATION, bonus: 4, ...faceAsset("", "tyranny-4") },
-    2: { kind: KIND_COMPLICATION, bonus: 2, ...faceAsset("", "tyranny-2") },
-    3: { kind: KIND_BLANK, bonus: 0, image: "", bump: "", emissive: "" },
-    4: { kind: KIND_BLANK, bonus: 0, image: "", bump: "", emissive: "" },
-    5: { kind: KIND_OPPORTUNITY, bonus: 0, ...faceAsset("", "defiance") },
-    6: { kind: KIND_OPPORTUNITY, bonus: 0, ...faceAsset("", "defiance") },
+    1: { kind: KIND_COMPLICATION, bonus: 4, ...faceAsset("", "complication-4") },
+    2: { kind: KIND_COMPLICATION, bonus: 2, ...faceAsset("", "complication-2") },
+    3: { kind: KIND_BLANK, bonus: 0, ...faceAsset("", "blank") },
+    4: { kind: KIND_BLANK, bonus: 0, ...faceAsset("", "blank") },
+    5: { kind: KIND_OPPORTUNITY, bonus: 0, ...faceAsset("", "opportunity") },
+    6: { kind: KIND_OPPORTUNITY, bonus: 0, ...faceAsset("", "opportunity") },
   },
   [PRESET_AEGIS_FALLEN]: {
     1: { kind: KIND_COMPLICATION, bonus: 4, ...faceAsset("aegis-fallen", "tyranny-4") },
@@ -82,8 +82,8 @@ export const FATE_PRESETS = {
       [KIND_BLANK]: "Blank",
     },
     colors: {
-      [KIND_OPPORTUNITY]: "#ff5a4a",
-      [KIND_COMPLICATION]: "#f5c455",
+      [KIND_OPPORTUNITY]: "#4f8eff",
+      [KIND_COMPLICATION]: "#ff4a4a",
       [KIND_BLANK]: "#dcdcdc",
     },
     dsn: {
