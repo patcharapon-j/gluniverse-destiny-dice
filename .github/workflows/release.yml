@@ -1,0 +1,96 @@
+name: Release
+
+# Manually triggered from the GitHub "Actions" tab. Pick patch / minor / major
+# and the workflow bumps module.json, builds module.zip, and publishes a
+# GitHub release whose assets back the manifest install/update link.
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Version bump"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: version
+        run: |
+          current=$(node -p "require('./module.json').version")
+          IFS='.' read -r major minor patch <<< "$current"
+          case "${{ inputs.release_type }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          new="${major}.${minor}.${patch}"
+          echo "Bumping ${current} -> ${new} (${{ inputs.release_type }})"
+          echo "current=${current}" >> "$GITHUB_OUTPUT"
+          echo "new=${new}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${new}" >> "$GITHUB_OUTPUT"
+
+      - name: Update module.json
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+          REPO: ${{ github.repository }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync("module.json", "utf8"));
+            const v = process.env.NEW_VERSION;
+            const repo = process.env.REPO;
+            m.version = v;
+            m.manifest = `https://github.com/${repo}/releases/latest/download/module.json`;
+            m.download = `https://github.com/${repo}/releases/download/v${v}/module.zip`;
+            fs.writeFileSync("module.json", JSON.stringify(m, null, 2) + "\n");
+          '
+
+      - name: Build module.zip
+        run: |
+          zip -r module.zip \
+            module.json \
+            scripts \
+            styles \
+            templates \
+            lang \
+            assets \
+            README.md \
+            LICENSE
+
+      - name: Commit, tag, and push
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add module.json
+          git commit -m "Release ${TAG}"
+          git tag "${TAG}"
+          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "${TAG}"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            module.json \
+            module.zip \
+            --title "${TAG}" \
+            --generate-notes

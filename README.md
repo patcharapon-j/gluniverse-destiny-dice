@@ -70,7 +70,7 @@ Dice So Nice texture changes require a Foundry reload. Result and value changes 
 
 ## Compatibility
 
-- **Foundry VTT**: v13+
+- **Foundry VTT**: v13+ (verified on v14)
 - **System**: PF2e v7.0.0+
 - **Recommended module**: Dice So Nice
 

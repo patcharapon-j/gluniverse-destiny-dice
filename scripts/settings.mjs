@@ -272,20 +272,33 @@ function normalizeImagePath(value) {
   return LEGACY_FACE_IMAGE_PATHS[trimmed] ?? trimmed;
 }
 
-class DestinyFaceConfig extends FormApplication {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "glddf-face-config",
-      title: game.i18n.localize("GLDDF.Settings.FaceConfig.Title"),
-      template: FACE_CONFIG_TEMPLATE,
-      width: 760,
-      height: "auto",
-      classes: ["glddf-face-config"],
-      closeOnSubmit: true,
-    });
-  }
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-  getData() {
+class DestinyFaceConfig extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: "glddf-face-config",
+    tag: "form",
+    classes: ["glddf-face-config"],
+    window: {
+      title: "GLDDF.Settings.FaceConfig.Title",
+      icon: "fa-solid fa-dice-d6",
+      contentClasses: ["standard-form"],
+    },
+    position: { width: 760, height: "auto" },
+    form: {
+      handler: DestinyFaceConfig.#onSubmit,
+      closeOnSubmit: true,
+    },
+    actions: {
+      browseImage: DestinyFaceConfig.#onBrowseImage,
+    },
+  };
+
+  static PARTS = {
+    form: { template: FACE_CONFIG_TEMPLATE },
+  };
+
+  async _prepareContext() {
     const kinds = Object.entries(FATE_KIND_CHOICES).map(([value, label]) => ({
       value,
       label: game.i18n.localize(label),
@@ -312,27 +325,23 @@ class DestinyFaceConfig extends FormApplication {
     };
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
-    html.find("[data-action='browse-image']").on("click", (event) => {
-      event.preventDefault();
-      const button = event.currentTarget;
-      const face = button.dataset.face;
-      const input = html.find(`input[name="face.${face}.image"]`)[0];
-      const preview = html.find(`[data-preview-face="${face}"]`)[0];
-      new FilePicker({
-        type: "image",
-        current: input?.value ?? "",
-        callback: (path) => {
-          if (input) input.value = path;
-          if (preview) preview.src = path;
-        },
-      }).render(true);
-    });
+  static async #onBrowseImage(_event, target) {
+    const face = target.dataset.face;
+    const input = this.element.querySelector(`input[name="face.${face}.image"]`);
+    const preview = this.element.querySelector(`[data-preview-face="${face}"]`);
+    const FilePickerImpl = foundry.applications.apps.FilePicker?.implementation ?? globalThis.FilePicker;
+    new FilePickerImpl({
+      type: "image",
+      current: input?.value ?? "",
+      callback: (path) => {
+        if (input) input.value = path;
+        if (preview) preview.src = path;
+      },
+    }).render(true);
   }
 
-  async _updateObject(_event, formData) {
-    const expanded = foundry.utils.expandObject(formData);
+  static async #onSubmit(_event, _form, formData) {
+    const expanded = foundry.utils.expandObject(formData.object);
     for (const face of FACE_NUMBERS) {
       const data = expanded.face?.[face] ?? {};
       const defaults = PRESET_FATE_FACES[PRESET_DEFAULT][face];

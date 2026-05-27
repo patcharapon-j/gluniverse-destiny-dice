@@ -2,10 +2,10 @@
   "id": "gluniverse-destiny-dice",
   "title": "GLUniverse Destiny Dice",
   "description": "Adds a configurable Destiny Fate Die (Opportunity/Complication, with Aegis Fallen and Tides of Destiny terminology presets) to PF2e checks, Hero Point rerolls, chat cards, and Dice So Nice. Includes per-preset dice art, configurable emission intensity, and a polished chat-card result strip.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "compatibility": {
     "minimum": "13",
-    "verified": "13"
+    "verified": "14"
   },
   "authors": [
     {
