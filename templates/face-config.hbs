@@ -1,4 +1,4 @@
-<form class="glddf-face-config-form" autocomplete="off">
+<div class="glddf-face-config-form">
   <p class="notes">{{reloadHint}}</p>
 
   <div class="glddf-face-config-grid">
@@ -27,7 +27,7 @@
           <span>PNG</span>
           <div class="glddf-face-config-file">
             <input type="text" name="face.{{face}}.image" value="{{image}}" placeholder="{{imagePlaceholder}}" />
-            <button type="button" data-action="browse-image" data-face="{{face}}" data-tooltip="Browse">
+            <button type="button" data-action="browseImage" data-face="{{face}}" data-tooltip="Browse">
               <i class="fa-solid fa-folder-open"></i>
             </button>
           </div>
@@ -42,4 +42,4 @@
       Save
     </button>
   </footer>
-</form>
+</div>

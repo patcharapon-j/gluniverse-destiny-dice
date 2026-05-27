@@ -5,17 +5,13 @@ const FATED_OPTION = "glddf:fated-roll";
 const pendingHeroRerolls = [];
 
 export function registerPF2eIntegration() {
-  Hooks.on("renderApplication", injectFatedRollToggle);
   Hooks.on("renderCheckModifiersDialog", injectFatedRollToggle);
   Hooks.on("getChatMessageContextOptions", addChatContextOptions);
-  Hooks.on("getChatLogEntryContext", addChatContextOptions);
   Hooks.on("createChatMessage", onCreateChatMessage);
   Hooks.on("pf2e.reroll", onPF2eReroll);
-  Hooks.once("setup", patchChatContextMenu);
 
   Hooks.once("ready", () => {
     patchPF2eCheckMethods();
-    patchChatContextMenu();
   });
 }
 
@@ -62,20 +58,6 @@ function patchPF2eCheckMethods() {
   console.log("GLUniverse Destiny Dice | PF2e check integration registered");
 }
 
-function patchChatContextMenu() {
-  const ChatLog = CONFIG.ui.chat;
-  const prototype = ChatLog?.prototype;
-  if (!prototype?._getEntryContextOptions || prototype._getEntryContextOptions._glddfPatched) return;
-
-  const original = prototype._getEntryContextOptions;
-  prototype._getEntryContextOptions = function wrappedFateContextOptions(...args) {
-    const options = original.apply(this, args);
-    addChatContextOptions(null, options);
-    return options;
-  };
-  prototype._getEntryContextOptions._glddfPatched = true;
-}
-
 function injectFatedRollToggle(app, html) {
   const element = normalizeHtml(html);
   const form = element?.querySelector?.("form.check-modifiers-content");
@@ -95,15 +77,20 @@ function injectFatedRollToggle(app, html) {
     setFatedContext(app.context, input.checked);
   });
 
-  form.querySelector("button.roll")?.addEventListener("click", () => {
+  // PF2e v14-dev renamed the roll button to a generic submit button and the
+  // fate radios from `.fate` to `.roll-twice`; keep the legacy selectors as
+  // fallbacks for older PF2e versions.
+  const rollButton = form.querySelector("button.roll, button[type='submit']");
+  rollButton?.addEventListener("click", () => {
     if (!input.checked) return;
     setFatedContext(app.context, true);
   });
 
   const divider = document.createElement("hr");
-  const fateSection = form.querySelector(".fate");
-  if (fateSection) fateSection.after(divider, row);
-  else form.querySelector("button.roll")?.before(row, divider);
+  const anchor = form.querySelector(".roll-twice, .fate");
+  if (anchor) anchor.after(divider, row);
+  else if (rollButton) rollButton.before(row, divider);
+  else form.append(divider, row);
 
   window.setTimeout(() => {
     app.setPosition?.({ height: (app.position?.height ?? form.closest(".window-content")?.offsetHeight ?? 0) + 36 });
