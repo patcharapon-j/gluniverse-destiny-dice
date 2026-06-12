@@ -6,7 +6,7 @@ Adds a configurable Destiny Fate Die to Foundry VTT PF2e checks, Hero Point rero
 
 - **PF2e fate die integration** - Adds the configured Destiny Dice result to supported PF2e checks.
 - **Hero Point reroll support** - Shows fate die outcomes on reroll workflows.
-- **Chat card results** - Displays Opportunity, Complication, blank results, and configured values in roll output.
+- **Chat card results** - Displays Opportunity, Complication, blank results, and configured values in roll output, rendered in the GL Universe *Etched Glass* style — a frosted-glass result card with a chamfered corner, etched registration marks, and a precision-rule reveal sweep.
 - **Dice So Nice textures** - Supplies label, bump, and emissive maps for the fate die faces.
 - **Terminology presets** - Pick between the default terminology (Opportunity / Complication), the *Aegis Fallen* preset (Defiance / Tyranny), or the *Tides of Destiny* preset (Tide / Storm).
 - **Configurable die faces** - GMs can configure each physical face with:
@@ -53,6 +53,20 @@ The preset controls the labels and theme colors used in chat strips, dice toolti
 Open **Configure Settings > Module Settings > GLUniverse Destiny Dice > Dice Emission Intensity**.
 
 A slider from 0 to 2 (default 1.0) that controls the glow strength of the Dice So Nice emission maps. The emission map textures already carry their own color — 1.0 displays them as authored, lower values dim the glow, and higher values brighten it further. Requires a reload.
+
+### Animation Style
+
+Open **Configure Settings > Module Settings > GLUniverse Destiny Dice > Animation Style**.
+
+Controls the *Etched Glass* result-card animations (per client):
+
+| Tier | Behavior |
+| --- | --- |
+| Reduced | Result cards appear with a simple fade. |
+| Default | Full reveal — a precision rule sweeps across the card and the result lights up behind it. |
+| Cinematic | The reveal is lengthened and gains a trailing flare. |
+
+This is force-clamped to **Reduced** whenever your operating system requests reduced motion.
 
 ### Dice Faces
 

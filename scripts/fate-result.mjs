@@ -82,18 +82,42 @@ function getFaceResult(roll) {
   return face ? { value, ...face } : null;
 }
 
+// A freshly-applied fate plays the reveal-contract ceremony (§6.3); re-renders
+// of an older message (scroll, edit) render the strip in its settled state.
+const FATE_REVEAL_WINDOW_MS = 4000;
+
 function renderFateBar(fate) {
   const kind = normalizeKind(fate.kind);
   const kindLabel = getKindLabel(kind);
-  const classes = ["glddf-fate-strip", `glddf-${kind}`, fate.accepted === false ? "glddf-refused" : ""].filter(Boolean).join(" ");
+  const isFresh = Number.isFinite(fate.appliedAt) && Date.now() - fate.appliedAt < FATE_REVEAL_WINDOW_MS;
+  const classes = [
+    "glddf-fate-strip",
+    `glddf-${kind}`,
+    fate.accepted === false ? "glddf-refused" : "",
+    isFresh && fate.accepted !== false ? "glddf-reveal" : "",
+  ].filter(Boolean).join(" ");
+
   const showBonus = kind !== KIND_OPPORTUNITY && fate.bonus !== 0;
-  const bonusBadge = showBonus ? `<span class="glddf-fate-bonus">${formatSignedNumber(fate.bonus)}</span>` : "";
+  const bonusLockup = showBonus
+    ? `<div class="glddf-fate-bonus">
+        <span class="glddf-fate-bonus-num">${formatSignedNumber(fate.bonus)}</span>
+        <span class="glddf-fate-bonus-unit">MOD</span>
+      </div>`
+    : "";
+
+  // Fake technical designator — pure provenance garnish (§4.2).
+  const serial = `GLU·FATE · 0${fate.face}`;
 
   return `<footer class="${classes}" data-fate-face="${fate.face}">
+    <i class="glddf-cut" aria-hidden="true"></i>
+    <i class="glddf-bracket" aria-hidden="true"></i>
     ${renderGlyph(fate)}
     <div class="glddf-fate-body">
-      <span class="glddf-fate-name">${kindLabel}</span>
-      ${bonusBadge}
+      <div class="glddf-fate-lines">
+        <span class="glddf-fate-kicker">${serial}</span>
+        <span class="glddf-fate-name">${kindLabel}</span>
+      </div>
+      ${bonusLockup}
     </div>
   </footer>`;
 }
