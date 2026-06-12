@@ -15,6 +15,17 @@ import {
 export const SETTINGS = {
   preset: "preset",
   emissiveIntensity: "emissiveIntensity",
+  motionTier: "motionTier",
+};
+
+// Motion tiers (§6.4). `prefers-reduced-motion` force-clamps to "reduced".
+export const MOTION_TIERS = ["reduced", "default", "cinematic"];
+export const MOTION_TIER_DEFAULT = "default";
+
+const MOTION_TIER_CHOICES = {
+  reduced: "GLDDF.Settings.MotionTier.Reduced",
+  default: "GLDDF.Settings.MotionTier.Default",
+  cinematic: "GLDDF.Settings.MotionTier.Cinematic",
 };
 
 export const EMISSIVE_INTENSITY_DEFAULT = 1.0;
@@ -93,6 +104,17 @@ export function registerSettings() {
     },
     default: EMISSIVE_INTENSITY_DEFAULT,
     requiresReload: true,
+  });
+
+  // Motion is an accessibility/preference concern → per-client scope.
+  reg(SETTINGS.motionTier, {
+    name: "GLDDF.Settings.MotionTier.Name",
+    hint: "GLDDF.Settings.MotionTier.Hint",
+    scope: "client",
+    type: String,
+    choices: MOTION_TIER_CHOICES,
+    default: MOTION_TIER_DEFAULT,
+    onChange: applyMotionTier,
   });
 
   game.settings.registerMenu(MODULE_ID, "faceConfig", {
@@ -355,17 +377,18 @@ class DestinyFaceConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 }
 
+// Etched Glass drives every surface from ONE variable: --gl-accent (§2.5).
+// The active preset's per-kind colors flow into that channel; all glass fills,
+// rails, rims and glows are derived from it in CSS via color-mix. The Fated
+// Roll toggle is a commit control and stays on the fixed signal-amber accent
+// (§2.4), so it is intentionally not themed here.
 export function applyThemeFromSettings() {
   if (typeof document === "undefined") return;
-  const opportunity = getKindColor("opportunity");
-  const complication = getKindColor("complication");
-  const blank = getKindColor("blank");
 
   const css = [
-    themeStripRule(".glddf-fate-strip.glddf-opportunity", opportunity),
-    themeStripRule(".glddf-fate-strip.glddf-complication", complication),
-    themeStripRule(".glddf-fate-strip.glddf-blank", blank),
-    themeToggleRule(complication),
+    accentRule(".glddf-fate-strip.glddf-opportunity", getKindColor("opportunity")),
+    accentRule(".glddf-fate-strip.glddf-complication", getKindColor("complication")),
+    accentRule(".glddf-fate-strip.glddf-blank", getKindColor("blank")),
   ].join("\n");
 
   let style = document.getElementById("glddf-theme-overrides");
@@ -377,60 +400,18 @@ export function applyThemeFromSettings() {
   style.textContent = css;
 }
 
-function themeStripRule(selector, color) {
-  return `
-${selector} {
-  --glddf-rail: ${color};
-  --glddf-rail-glow: color-mix(in oklab, ${color} 50%, transparent);
-  --glddf-tint: color-mix(in oklab, ${color} 22%, transparent);
-  --glddf-edge: color-mix(in oklab, ${color} 38%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, ${color} 12%, transparent), transparent 28%),
-    radial-gradient(ellipse at 0% 50%, color-mix(in oklab, ${color} 24%, transparent), transparent 60%),
-    linear-gradient(135deg, color-mix(in oklab, ${color} 12%, #0d0e15) 0%, color-mix(in oklab, ${color} 6%, #0a0b12) 55%, #06070b 100%);
-  color: color-mix(in oklab, ${color} 38%, #f7efd6);
-}`;
+function accentRule(selector, color) {
+  return `${selector} { --gl-accent: ${color}; }`;
 }
 
-function themeToggleRule(color) {
-  return `
-.glddf-fated-roll-toggle {
-  border-color: color-mix(in oklab, ${color} 38%, transparent);
-  color: color-mix(in oklab, ${color} 35%, #fff5d5);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, ${color} 14%, transparent), transparent 28%),
-    radial-gradient(ellipse at 0% 50%, color-mix(in oklab, ${color} 24%, transparent), transparent 60%),
-    linear-gradient(135deg, color-mix(in oklab, ${color} 14%, #1d180a) 0%, color-mix(in oklab, ${color} 7%, #15110a) 55%, #100c08 100%);
-}
-.glddf-fated-roll-toggle::before {
-  background: ${color};
-  box-shadow:
-    0 0 6px ${color},
-    0 0 14px color-mix(in oklab, ${color} 50%, transparent);
-}
-.glddf-fated-roll-toggle:hover {
-  border-color: color-mix(in oklab, ${color} 56%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    0 0 12px color-mix(in oklab, ${color} 22%, transparent),
-    0 1px 3px rgba(0, 0, 0, 0.5),
-    0 6px 14px rgba(0, 0, 0, 0.4);
-}
-.glddf-fated-roll-toggle:has(input:checked) {
-  border-color: color-mix(in oklab, ${color} 72%, transparent);
-  color: color-mix(in oklab, ${color} 50%, #fff5d5);
-  box-shadow:
-    inset 0 0 14px color-mix(in oklab, ${color} 22%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 16px color-mix(in oklab, ${color} 38%, transparent),
-    0 1px 3px rgba(0, 0, 0, 0.5),
-    0 6px 14px rgba(0, 0, 0, 0.4);
-}
-.glddf-fated-roll-toggle > span {
-  text-shadow:
-    0 0 6px color-mix(in oklab, ${color} 28%, transparent),
-    0 1px 0 rgba(0, 0, 0, 0.5);
-}
-.glddf-fated-roll-toggle input { accent-color: ${color}; }`;
+// Applies the motion-tier setting as a body class (§6.4). The CSS clamps to
+// the reduced tier under `prefers-reduced-motion` regardless of this value.
+export function applyMotionTier() {
+  if (typeof document === "undefined" || !document.body) return;
+  const tier = MOTION_TIERS.includes(getSetting(SETTINGS.motionTier))
+    ? getSetting(SETTINGS.motionTier)
+    : MOTION_TIER_DEFAULT;
+  for (const candidate of MOTION_TIERS) {
+    document.body.classList.toggle(`glddf-motion-${candidate}`, candidate === tier);
+  }
 }
