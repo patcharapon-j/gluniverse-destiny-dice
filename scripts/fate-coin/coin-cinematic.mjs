@@ -476,7 +476,14 @@ export class CoinCinematic {
     // the faces semi-metallic dielectrics so the albedo, bump (normal map), and
     // emission read true under the scene lights while still looking coin-like.
     if (maps.texture) {
-      mat.albedoTexture = this.#safeTexture(scene, maps.texture);
+      // If the user's image fails to load (bad path, missing file), fall back to
+      // the procedural face so they see a coin rather than a blank one — and the
+      // failing URL is logged so the path can be fixed.
+      mat.albedoTexture = this.#safeTexture(scene, maps.texture, {
+        onError: () => {
+          mat.albedoTexture = this.#proceduralFace(scene, label, isGood);
+        },
+      });
       mat.metallic = 0.35; // let the user's art read clearly
       mat.roughness = 0.45;
     } else {
@@ -524,11 +531,38 @@ export class CoinCinematic {
     return mat;
   }
 
-  #safeTexture(scene, path) {
+  // Resolve a Foundry asset path to a URL Babylon can actually fetch. FilePicker
+  // returns paths relative to the data root (e.g. "worlds/x/coin.png"); Babylon
+  // would otherwise resolve them against the document base URL and 404. Already-
+  // absolute URLs (http(s):, data:, blob:, or a leading "/") are passed through.
+  #resolveAssetUrl(path) {
+    if (typeof path !== "string" || !path) return path;
+    if (/^(?:https?:|data:|blob:|\/)/i.test(path)) return path;
     try {
-      return new BABYLON.Texture(path, scene, false, false);
+      const routed = foundry?.utils?.getRoute?.(path);
+      if (typeof routed === "string" && routed) return routed;
+    } catch {}
+    return path;
+  }
+
+  #safeTexture(scene, path, { onError } = {}) {
+    const url = this.#resolveAssetUrl(path);
+    try {
+      return new BABYLON.Texture(
+        url,
+        scene,
+        false, // generate mipmaps
+        false, // invertY
+        BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
+        null,
+        (message, exception) => {
+          console.error("GLUniverse Fate Coin | texture failed to load", url, message, exception);
+          try { onError?.(); } catch {}
+        },
+      );
     } catch (error) {
-      console.warn("GLUniverse Fate Coin | failed to load texture", path, error);
+      console.error("GLUniverse Fate Coin | texture construction failed", url, error);
+      try { onError?.(); } catch {}
       return null;
     }
   }
