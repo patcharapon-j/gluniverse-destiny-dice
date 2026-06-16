@@ -14,26 +14,27 @@
 import * as CANNON from "../vendor/cannon-es.js";
 
 export const PHYS = {
-  // Fixed simulation timestep. Stepped `stepsPerFrame` times per rendered frame
-  // so the outcome is independent of a client's display framerate.
+  // Fixed simulation timestep. The renderer advances a deterministic number of
+  // these steps each frame (paced for cinematic effect), so the outcome is
+  // independent of a client's display framerate.
   dt: 1 / 120,
-  stepsPerFrame: 2,
   maxSteps: 1400, // hard cap (~11.6s of sim) before we force a settle
 
   radius: 1.0,
   thickness: 0.16,
   mass: 1,
-  restitution: 0.34,
+  restitution: 0.4,
   friction: 0.45,
-  gravity: 26,
+  gravity: 14, // floaty, for a long, tense hang time
 
   // Launch envelope. Coins start hovering at PRESENT_Y, then are thrown upward
-  // with a strong horizontal-axis spin so they flip like a tossed coin.
+  // with a strong horizontal-axis spin so they flip like a tossed coin. A high,
+  // slow arc (low gravity) gives the flip room to breathe.
   presentY: 5.0,
-  upMin: 6.5,
-  upMax: 9.0,
-  spinMin: 15,
-  spinMax: 28,
+  upMin: 9.5,
+  upMax: 12.0,
+  spinMin: 13,
+  spinMax: 24,
 
   // Side-by-side layout spacing for multi-coin flips.
   spacing: 2.7,

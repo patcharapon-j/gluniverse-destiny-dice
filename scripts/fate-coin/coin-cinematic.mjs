@@ -42,6 +42,8 @@ export class CoinCinematic {
     this.coins = [];
     this._phase = "idle"; // idle → sim → done
     this._clock = 0;
+    this._timeScale = 0.85; // cinematic pacing, eased toward slow-mo near landing
+    this._accum = 0;
     this._tossResolve = null;
     this._onResize = () => this.engine?.resize();
   }
@@ -53,10 +55,12 @@ export class CoinCinematic {
     scene.clearColor = new BABYLON.Color4(0, 0, 0, 0); // CSS vignette shows through
 
     const count = this.payload.coins.length;
-    const radius = Math.max(9, count * 2.4 + 6);
+    // Near top-down view, like Foundry's dice: we look straight down at the
+    // landing spot, and the coins arc up toward the camera as they flip.
+    const radius = Math.max(18, count * 3 + 13);
 
-    const camera = new BABYLON.ArcRotateCamera("glfc-cam", -Math.PI / 2, 1.15, radius, new BABYLON.Vector3(0, 1.6, 0), scene);
-    camera.fov = 0.75;
+    const camera = new BABYLON.ArcRotateCamera("glfc-cam", -Math.PI / 2, 0.12, radius, new BABYLON.Vector3(0, 0, 0), scene);
+    camera.fov = 0.7;
     camera.minZ = 0.1;
 
     const hemi = new BABYLON.HemisphericLight("glfc-hemi", new BABYLON.Vector3(0, 1, 0), scene);
@@ -133,18 +137,34 @@ export class CoinCinematic {
     }
 
     if (this._phase === "sim") {
+      // Cinematic pacing: ease toward slow-motion as the coins shed energy, so
+      // the landing draws out tensely. Pacing only changes how fast we advance
+      // through the fixed-timestep sim across wall-clock frames — never which
+      // steps run or where the coin lands, so determinism is untouched.
+      let maxEnergy = 0;
+      for (const coin of this.coins) {
+        if (coin.world && !coin.settled) {
+          maxEnergy = Math.max(maxEnergy, coin.body.velocity.length() + coin.body.angularVelocity.length());
+        }
+      }
+      this._timeScale += (this.#scaleForEnergy(maxEnergy) - this._timeScale) * 0.1;
+      this._accum += (dtMs / 1000) * this._timeScale;
+      const budget = Math.min(8, Math.floor(this._accum / PHYS.dt));
+      this._accum -= budget * PHYS.dt;
+
       let allDone = true;
       for (const coin of this.coins) {
         if (!coin.world) continue;
         if (!coin.settled) {
-          for (let s = 0; s < PHYS.stepsPerFrame; s++) {
+          for (let s = 0; s < budget; s++) {
             coin.world.step(PHYS.dt);
-            coin.steps = (coin.steps ?? 0) + 1;
+            coin.steps += 1;
             if (isAtRest(coin.body)) {
               if (++coin.quiet >= REST_FRAMES) break;
             } else {
               coin.quiet = 0;
             }
+            if (coin.steps >= PHYS.maxSteps) break;
           }
           this.#syncMesh(coin);
           if (coin.quiet >= REST_FRAMES || coin.steps >= PHYS.maxSteps) {
@@ -163,6 +183,18 @@ export class CoinCinematic {
         done();
       }
     }
+  }
+
+  // Map remaining kinetic energy to a playback speed: full-tilt while tumbling,
+  // deep slow-motion as a coin approaches rest.
+  #scaleForEnergy(energy) {
+    const hi = 12;
+    const lo = 2.0;
+    const fast = 0.85;
+    const slow = 0.22;
+    if (energy >= hi) return fast;
+    if (energy <= lo) return slow;
+    return slow + ((fast - slow) * (energy - lo)) / (hi - lo);
   }
 
   #syncMesh(coin) {
@@ -350,11 +382,13 @@ export class CoinCinematic {
         coin.steps = 0;
         this.#syncMesh(coin);
       }
+      this._timeScale = 0.85;
+      this._accum = 0;
       this._tossResolve = resolve;
       this._phase = "sim";
 
       // Safety net: never hang the ceremony if a client can't reach rest.
-      const guardMs = (PHYS.maxSteps * PHYS.dt * 1000) / PHYS.stepsPerFrame + 2000;
+      const guardMs = 30000;
       this._guard = window.setTimeout(() => {
         if (this._tossResolve) {
           for (const coin of this.coins) {
