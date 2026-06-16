@@ -18,13 +18,13 @@ export const PHYS = {
   // these steps each frame (paced for cinematic effect), so the outcome is
   // independent of a client's display framerate.
   dt: 1 / 120,
-  maxSteps: 2200, // hard cap before we force a settle
+  maxSteps: 2600, // hard cap before we force a settle
 
-  radius: 1.0,
-  thickness: 0.16,
+  radius: 0.8,
+  thickness: 0.13,
   mass: 1,
-  restitution: 0.66, // bouncy — many lively impacts before it settles
-  friction: 0.2, // low, so spin doesn't skitter the coin off-screen
+  restitution: 0.76, // very bouncy — lots of lively impacts before it settles
+  friction: 0.18, // low, so spin doesn't skitter the coin off-screen
   gravity: 14, // floaty, for a long, tense hang time
 
   // Launch envelope. Coins start hovering at PRESENT_Y, then are thrown upward

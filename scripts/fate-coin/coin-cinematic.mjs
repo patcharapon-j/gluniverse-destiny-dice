@@ -80,6 +80,7 @@ export class CoinCinematic {
 
     const glow = new BABYLON.GlowLayer("glfc-glow", scene);
     glow.intensity = 0.9;
+    this._glow = glow; // landing decals are excluded so they stay tight, not blooming
 
     // Shadow pool under the coins sells the physical landing.
     const shadow = new BABYLON.ShadowGenerator(1024, key);
@@ -330,6 +331,7 @@ export class CoinCinematic {
     mesh.position.set(x, 0.02 + layer * 0.004, z);
     mesh.isPickable = false;
     mesh.material = mat;
+    this._glow?.addExcludedMesh(mesh); // keep the decal crisp, no extra bloom
 
     this._ripples.push({ mesh, mat, age: 0, ...params });
   }
@@ -342,26 +344,26 @@ export class CoinCinematic {
     const x = coin.body?.position.x ?? coin.phaseX;
     const z = coin.body?.position.z ?? coin.phaseZ;
 
-    // Shared bright impact bloom.
+    // Shared, brief impact bloom — small and close to the coin.
     this.#pushDecal(this.#glowTexture(), tint, x, z, 0, {
-      delay: 0, growMs: 200, life: 420, fadeStart: 0, startScale: 0.6, endScale: coin.target ? 4.5 : 3.6, baseAlpha: 1.0,
+      delay: 0, growMs: 130, life: 260, fadeStart: 0, startScale: 0.5, endScale: 1.8, baseAlpha: 0.55,
     });
 
     if (coin.target) {
-      // Boon: two luminous pulse rings rippling outward.
+      // Boon: a tight luminous pulse ring snapping outward.
       this.#pushDecal(this.#ringTexture(), tint, x, z, 1, {
-        delay: 0, growMs: 360, life: 720, fadeStart: 110, startScale: 1.6, endScale: 11, baseAlpha: 0.95,
+        delay: 0, growMs: 220, life: 400, fadeStart: 60, startScale: 1.0, endScale: 4.2, baseAlpha: 0.55,
       });
       this.#pushDecal(this.#ringTexture(), tint, x, z, 2, {
-        delay: 120, growMs: 420, life: 760, fadeStart: 130, startScale: 1.4, endScale: 8, baseAlpha: 0.7,
+        delay: 90, growMs: 260, life: 440, fadeStart: 70, startScale: 0.9, endScale: 3.0, baseAlpha: 0.35,
       });
     } else {
       // Bane: fractures snap outward, with a quick shock ring.
       this.#pushDecal(this.#crackTexture(), tint, x, z, 1, {
-        delay: 40, growMs: 280, life: 980, fadeStart: 380, startScale: 0.4, endScale: 9, baseAlpha: 1.0,
+        delay: 30, growMs: 200, life: 620, fadeStart: 240, startScale: 0.4, endScale: 3.6, baseAlpha: 0.7,
       });
       this.#pushDecal(this.#ringTexture(), tint, x, z, 2, {
-        delay: 0, growMs: 300, life: 560, fadeStart: 80, startScale: 1.4, endScale: 7, baseAlpha: 0.8,
+        delay: 0, growMs: 220, life: 380, fadeStart: 50, startScale: 0.9, endScale: 3.2, baseAlpha: 0.5,
       });
     }
   }
@@ -673,6 +675,7 @@ export class CoinCinematic {
     } catch {}
     this.scene = null;
     this.engine = null;
+    this._glow = null;
     this.coins = [];
     this._ripples = [];
     this._ringTex = null;
