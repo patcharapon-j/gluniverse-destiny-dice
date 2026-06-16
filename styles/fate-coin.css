@@ -1,0 +1,519 @@
+/* ===========================================================================
+   GLUniverse Fate Coin — full-screen cinematic overlay + chat card
+   ---------------------------------------------------------------------------
+   System-agnostic. Borrows the shared "Etched Glass" GL tokens (--gl-*) that
+   destiny-dice.css defines on :root, themed here for the Boon / Bane verdict.
+   =========================================================================== */
+
+.glfc-overlay {
+  --glfc-accent: var(--gl-signal, #ffd24a);
+
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--gl-font-display, "Oxanium", system-ui, sans-serif);
+  overflow: hidden;
+  user-select: none;
+}
+
+.glfc-overlay.glfc-visible {
+  opacity: 1;
+}
+
+/* Dark dramatic vignette behind the (transparent) WebGL canvas. */
+.glfc-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 38%, rgba(10, 14, 22, 0.62), rgba(2, 4, 8, 0.96) 78%),
+    rgba(2, 4, 8, 0.82);
+  backdrop-filter: blur(6px) saturate(1.1);
+}
+
+.glfc-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glfc-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+/* --- Verdict banner ------------------------------------------------------- */
+.glfc-verdict {
+  position: relative;
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding: 1.4rem 2.6rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.glfc-overlay.glfc-phase-result .glfc-verdict {
+  display: flex;
+}
+
+.glfc-verdict--good {
+  --glfc-accent: var(--gl-good, #5fdb92);
+}
+
+.glfc-verdict--bad {
+  --glfc-accent: var(--gl-hazard, #ff4a52);
+}
+
+.glfc-verdict-kicker {
+  font-family: var(--gl-font-tech, monospace);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  color: var(--gl-text-faint, rgba(243, 251, 255, 0.5));
+}
+
+.glfc-verdict-name {
+  font-size: clamp(3rem, 11vw, 8rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: var(--gl-text-bright, #f3fbff);
+  text-shadow:
+    0 0 24px color-mix(in oklab, var(--glfc-accent) 70%, transparent),
+    0 0 64px color-mix(in oklab, var(--glfc-accent) 45%, transparent),
+    0 6px 0 rgba(0, 0, 0, 0.45);
+}
+
+.glfc-verdict-tally {
+  font-family: var(--gl-font-tech, monospace);
+  font-size: 1rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--glfc-accent) 40%, var(--gl-text, #eef1f7));
+}
+
+.glfc-verdict-pips {
+  display: flex;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+}
+
+.glfc-pip {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glfc-pip--good {
+  background: var(--gl-good, #5fdb92);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--gl-good, #5fdb92) 70%, transparent);
+}
+
+.glfc-pip--bad {
+  background: var(--gl-hazard, #ff4a52);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--gl-hazard, #ff4a52) 60%, transparent);
+}
+
+/* --- HUD (status + controls) --------------------------------------------- */
+.glfc-hud {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: auto;
+  margin-bottom: clamp(2rem, 8vh, 6rem);
+}
+
+.glfc-status {
+  margin: 0;
+  font-family: var(--gl-font-tech, monospace);
+  font-size: 1.05rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gl-text, #eef1f7);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
+.glfc-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.glfc-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 2.1rem;
+  font-family: var(--gl-font-display, "Oxanium", sans-serif);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gl-ink-0, #02070b);
+  cursor: pointer;
+  border: 1px solid color-mix(in oklab, var(--glfc-accent) 60%, rgba(255, 255, 255, 0.2));
+  border-radius: 12px;
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 50%),
+    var(--glfc-accent);
+  box-shadow:
+    0 0 22px color-mix(in oklab, var(--glfc-accent) 50%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+}
+
+.glfc-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 0 34px color-mix(in oklab, var(--glfc-accent) 60%, transparent);
+}
+
+.glfc-button:active {
+  transform: translateY(1px);
+}
+
+.glfc-button:disabled {
+  filter: grayscale(0.6) brightness(0.7);
+  cursor: default;
+  transform: none;
+}
+
+.glfc-button--flip {
+  --glfc-accent: var(--gl-good, #5fdb92);
+  font-size: 1.35rem;
+  padding: 1rem 2.8rem;
+}
+
+.glfc-button--force {
+  --glfc-accent: var(--gl-signal, #ffd24a);
+}
+
+.glfc-button--continue {
+  --glfc-accent: var(--gl-cyan, #5eeaff);
+}
+
+/* --- Reveal animation ----------------------------------------------------- */
+.glfc-reveal {
+  animation: glfc-reveal-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.glfc-verdict.glfc-reveal .glfc-verdict-name {
+  animation: glfc-pop-in 520ms cubic-bezier(0.34, 1.56, 0.5, 1) 80ms both;
+}
+
+@keyframes glfc-reveal-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glfc-pop-in {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* --- Static fallback (reduced-motion / no-WebGL) -------------------------- */
+.glfc-static {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glfc-static-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.glfc-static-coin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(5rem, 14vw, 9rem);
+  height: clamp(5rem, 14vw, 9rem);
+  border-radius: 50%;
+  font-family: var(--gl-font-display, "Oxanium", sans-serif);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.7);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  background: radial-gradient(circle at 50% 35%, #c9cdd6, #5b6070);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+.glfc-static-coin--spinning {
+  animation: glfc-coin-spin 0.7s linear infinite;
+}
+
+.glfc-static-coin--good {
+  color: #1d3a26;
+  background: radial-gradient(circle at 50% 32%, #fff6d8, #e9c45c 55%, #7a5a1e);
+  box-shadow: 0 0 26px color-mix(in oklab, var(--gl-good, #5fdb92) 55%, transparent);
+}
+
+.glfc-static-coin--bad {
+  color: #ffd9d2;
+  background: radial-gradient(circle at 50% 32%, #5a1f22, #321016 60%, #120608);
+  box-shadow: 0 0 26px color-mix(in oklab, var(--gl-hazard, #ff4a52) 50%, transparent);
+}
+
+@keyframes glfc-coin-spin {
+  from { transform: rotateX(0deg); }
+  to { transform: rotateX(360deg); }
+}
+
+/* ===========================================================================
+   Chat card — Etched Glass, Boon / Bane themed
+   =========================================================================== */
+.glfc-card {
+  --glfc-accent: var(--gl-text-dim, #98a2b6);
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 9px 0 5px;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--gl-text, #eef1f7);
+  font-family: var(--gl-font-tech, monospace);
+  border: 1px solid var(--gl-edge, rgba(255, 255, 255, 0.13));
+  border-radius: 13px;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(98deg, color-mix(in oklab, var(--glfc-accent) 14%, var(--gl-ink-1, #080b11)), var(--gl-ink-1, #080b11) 64%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -12px 28px rgba(0, 0, 0, 0.38);
+}
+
+.glfc-card--good {
+  --glfc-accent: var(--gl-good, #5fdb92);
+}
+
+.glfc-card--bad {
+  --glfc-accent: var(--gl-hazard, #ff4a52);
+}
+
+.glfc-card-cut {
+  position: absolute;
+  top: 8px;
+  right: -3px;
+  width: 22px;
+  height: 1px;
+  transform: rotate(-45deg);
+  background: color-mix(in oklab, var(--glfc-accent) 75%, transparent);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--glfc-accent) 60%, transparent);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.glfc-card-face {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex: 0 0 3.4rem;
+  padding: 0.4rem;
+  border-right: 1px solid color-mix(in oklab, var(--glfc-accent) 32%, var(--gl-hair, rgba(255, 255, 255, 0.08)));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.36));
+}
+
+.glfc-card-pip {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.glfc-card-pip--good {
+  background: var(--gl-good, #5fdb92);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--gl-good, #5fdb92) 65%, transparent);
+}
+
+.glfc-card-pip--bad {
+  background: var(--gl-hazard, #ff4a52);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--gl-hazard, #ff4a52) 55%, transparent);
+}
+
+.glfc-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding: 0.55rem 1.05rem;
+  position: relative;
+}
+
+.glfc-card-body::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.34rem;
+  bottom: 0.34rem;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--glfc-accent);
+  box-shadow: 0 0 6px var(--glfc-accent), 0 0 14px color-mix(in oklab, var(--glfc-accent) 45%, transparent);
+}
+
+.glfc-card-kicker {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--gl-text-faint, rgba(243, 251, 255, 0.38));
+}
+
+.glfc-card-name {
+  font-family: var(--gl-font-display, "Oxanium", sans-serif);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gl-text-bright, #f3fbff);
+  text-shadow: 0 0 10px color-mix(in oklab, var(--glfc-accent) 35%, transparent), 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.glfc-card-tally,
+.glfc-card-flipper {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--gl-text-dim, #98a2b6);
+}
+
+/* ===========================================================================
+   Config dialog
+   =========================================================================== */
+.glfc-coin-config-form {
+  display: grid;
+  gap: 0.8rem;
+  font-family: var(--gl-font-display, "Oxanium", sans-serif);
+}
+
+.glfc-coin-config-form .notes {
+  color: var(--gl-text-dim, #98a2b6);
+  font-family: var(--gl-font-tech, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.glfc-config-fieldset {
+  border: 1px solid var(--gl-edge, rgba(255, 255, 255, 0.13));
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem 0.8rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.glfc-config-fieldset legend {
+  font-family: var(--gl-font-tech, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0 0.4rem;
+}
+
+.glfc-config-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.glfc-config-map,
+.glfc-config-labels label {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.glfc-config-map > span,
+.glfc-config-labels label > span {
+  font-family: var(--gl-font-tech, monospace);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gl-text-dim, #98a2b6);
+}
+
+.glfc-config-file {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.glfc-config-file input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.glfc-config-file button {
+  flex: 0 0 2rem;
+  margin: 0;
+}
+
+/* --- Setup dialog --------------------------------------------------------- */
+.glfc-dialog {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.glfc-dialog-hint,
+.glfc-dialog-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--gl-text-dim, #98a2b6);
+}
+
+.glfc-dialog-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* ===========================================================================
+   Reduced motion (§Q12) — drop the spins and pops, keep the result legible
+   =========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .glfc-overlay { transition: opacity 200ms ease; }
+  .glfc-reveal,
+  .glfc-verdict.glfc-reveal .glfc-verdict-name { animation: glfc-fade-in 200ms ease both; }
+  .glfc-static-coin--spinning { animation: none; }
+}
+
+body.glddf-motion-reduced .glfc-reveal,
+body.glddf-motion-reduced .glfc-verdict.glfc-reveal .glfc-verdict-name {
+  animation: glfc-fade-in 220ms ease both;
+}
+
+body.glddf-motion-reduced .glfc-static-coin--spinning {
+  animation: none;
+}
+
+@keyframes glfc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

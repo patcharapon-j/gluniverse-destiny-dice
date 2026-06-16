@@ -1,8 +1,8 @@
 {
   "id": "gluniverse-destiny-dice",
   "title": "GLUniverse Destiny Dice",
-  "description": "Adds a configurable Destiny Fate Die (Opportunity/Complication, with Aegis Fallen and Tides of Destiny terminology presets) to PF2e checks, Hero Point rerolls, chat cards, and Dice So Nice. Includes per-preset dice art, configurable emission intensity, and a polished chat-card result strip.",
-  "version": "0.4.1",
+  "description": "Adds a configurable Destiny Fate Die (Opportunity/Complication, with Aegis Fallen and Tides of Destiny terminology presets) to PF2e checks, Hero Point rerolls, chat cards, and Dice So Nice — plus a system-agnostic, full-screen cinematic Fate Coin (Boon/Bane) with a real rigid-body coin flip (Babylon.js render, cannon-es physics), custom texture/bump/emission maps, GM-delegated flips, and multi-coin threshold outcomes.",
+  "version": "0.6.0",
   "compatibility": {
     "minimum": "13",
     "verified": "14"
@@ -12,11 +12,15 @@
       "name": "GLUniverse"
     }
   ],
+  "scripts": [
+    "scripts/vendor/babylon.js"
+  ],
   "esmodules": [
     "scripts/main.mjs"
   ],
   "styles": [
-    "styles/destiny-dice.css"
+    "styles/destiny-dice.css",
+    "styles/fate-coin.css"
   ],
   "languages": [
     {
