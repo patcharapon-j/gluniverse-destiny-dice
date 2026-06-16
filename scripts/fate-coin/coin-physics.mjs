@@ -18,7 +18,7 @@ export const PHYS = {
   // these steps each frame (paced for cinematic effect), so the outcome is
   // independent of a client's display framerate.
   dt: 1 / 120,
-  maxSteps: 2600, // hard cap before we force a settle
+  maxSteps: 1400, // hard cap before we force a settle
 
   radius: 0.8,
   thickness: 0.13,
@@ -46,10 +46,19 @@ export const PHYS = {
   spacing: 2.7,
 
   // Rest detection thresholds (squared speeds) and how many consecutive quiet
-  // steps confirm a settle.
+  // steps confirm a clean settle.
   restLinSq: 0.0025,
   restAngSq: 0.0025,
   restFrames: 36,
+
+  // Looser "grounded & slow" settle. A coin can come to rest in a metastable
+  // pose — balanced on its edge, or barely nudging a wall — where it dribbles
+  // below a clean stop for a long time. Once it's down near the floor and
+  // moving slowly for this many steps we call it settled (the final align then
+  // lays it flat) so it can never hang tilted on screen.
+  slowLinSq: 0.06,
+  slowAngSq: 0.09,
+  slowFrames: 90,
 };
 
 const LOCAL_UP = new CANNON.Vec3(0, 1, 0);
@@ -80,11 +89,12 @@ export function buildWorld(centerX = 0) {
   ground.quaternion.setFromEuler(-Math.PI / 2, 0, 0); // normal points +Y
   world.addBody(ground);
 
-  // Four invisible walls boxing the coin in (lower restitution so they nudge
-  // rather than fling it back).
+  // Four invisible walls boxing the coin in: low restitution so they nudge
+  // rather than fling it back, and frictionless so a coin can never grip a wall
+  // and balance against it — it always slides back down to the floor.
   const wallMat = new CANNON.Material("glfc-wall");
   world.addContactMaterial(
-    new CANNON.ContactMaterial(coinMat, wallMat, { restitution: 0.2, friction: 0.1 }),
+    new CANNON.ContactMaterial(coinMat, wallMat, { restitution: 0.15, friction: 0.0 }),
   );
   const r = PHYS.wallR;
   const h = PHYS.wallH;
@@ -144,6 +154,34 @@ export function isAtRest(body) {
   );
 }
 
+// Per-coin settle tracker. Shared by the GM solve and every client replay so
+// they agree on when a coin has come to rest (and therefore tumble identically).
+export function makeSettle() {
+  return { quiet: 0, slow: 0 };
+}
+
+// Advance the settle tracker one step; returns true once the coin is settled.
+// Strict path: held below a clean stop for restFrames. Loose path: grounded and
+// moving slowly for slowFrames (resolves edge-balances / wall nudges). The step
+// cap is a final guarantee it always terminates.
+export function settleStep(state, body, step) {
+  const v2 = body.velocity.lengthSquared();
+  const w2 = body.angularVelocity.lengthSquared();
+
+  if (v2 < PHYS.restLinSq && w2 < PHYS.restAngSq) state.quiet += 1;
+  else state.quiet = 0;
+
+  const grounded = body.position.y < PHYS.radius * 1.25;
+  if (grounded && v2 < PHYS.slowLinSq && w2 < PHYS.slowAngSq) state.slow += 1;
+  else state.slow = 0;
+
+  return (
+    state.quiet >= PHYS.restFrames ||
+    state.slow >= PHYS.slowFrames ||
+    step >= PHYS.maxSteps - 1
+  );
+}
+
 // A randomized launch. The big horizontal-axis component (ax) is what makes the
 // coin flip face-over-face; smaller y/z spin adds natural wobble.
 function randomThrow(x, rand, scratch) {
@@ -179,21 +217,19 @@ export function solveThrow(x, targetGood, rand = Math.random) {
     const body = buildBody(ctx, spec);
     last = spec;
 
-    let settled = false;
-    let quiet = 0;
+    const settle = makeSettle();
+    let cappedOut = false;
     for (let step = 0; step < PHYS.maxSteps; step++) {
       ctx.world.step(PHYS.dt);
-      if (isAtRest(body)) {
-        if (++quiet >= PHYS.restFrames) {
-          settled = true;
-          break;
-        }
-      } else {
-        quiet = 0;
+      if (settleStep(settle, body, step)) {
+        cappedOut = step >= PHYS.maxSteps - 1;
+        break;
       }
     }
 
-    if (settled && goodFaceUp(body) === targetGood) return spec;
+    // A coin forced to stop only by the step cap hasn't truly settled — reject
+    // it so we don't broadcast a launch that ends with a visible align flip.
+    if (!cappedOut && goodFaceUp(body) === targetGood) return spec;
   }
   // Extremely unlikely to fall through; the client-side align will correct it.
   return last;

@@ -11,15 +11,20 @@ import {
   PHYS,
   buildWorld,
   buildBody,
-  goodFaceUp,
-  isAtRest,
+  makeSettle,
+  settleStep,
 } from "./coin-physics.mjs";
 
 const RADIUS = PHYS.radius;
 const THICKNESS = PHYS.thickness;
 
 const ALIGN_MS = 300; // gentle final settle/correction to the authoritative face
-const REST_FRAMES = PHYS.restFrames;
+
+// Steady playback pace: the simulation runs a touch slower than real time for a
+// dramatic, weighty tumble (no per-frame slow-motion ramp). This only changes
+// how fast we advance through the fixed-timestep sim across wall-clock frames —
+// never which steps run or where the coin lands, so determinism is untouched.
+const PACE = 0.7;
 
 export function isCinematicSupported() {
   if (typeof BABYLON === "undefined" || !BABYLON.Engine) return false;
@@ -42,8 +47,7 @@ export class CoinCinematic {
     this.coins = [];
     this._phase = "idle"; // idle → sim → done
     this._clock = 0;
-    this._timeScale = 0.85; // cinematic pacing, eased toward slow-mo near landing
-    this._accum = 0;
+    this._accum = 0; // leftover sub-step time carried between frames
     this._ripples = []; // expanding surface shockwaves spawned on landing
     this._rippleTex = null;
     this._tossResolve = null;
@@ -110,7 +114,7 @@ export class CoinCinematic {
       root.position.set(spec.px ?? 0, PHYS.presentY, spec.pz ?? 0);
       root.rotationQuaternion = BABYLON.Quaternion.Identity();
       shadow.addShadowCaster(caster, true);
-      this.coins.push({ root, caster, spec, target: !!coin.good, world: null, body: null, settled: false, quiet: 0, align: null, phaseX: spec.px ?? 0, phaseZ: spec.pz ?? 0 });
+      this.coins.push({ root, caster, spec, target: !!coin.good, world: null, body: null, settled: false, settle: null, align: null, phaseX: spec.px ?? 0, phaseZ: spec.pz ?? 0 });
     });
 
     scene.onBeforeRenderObservable.add(() => this.#onFrame());
@@ -141,34 +145,25 @@ export class CoinCinematic {
     }
 
     if (this._phase === "sim") {
-      // Cinematic pacing: ease toward slow-motion as the coins shed energy, so
-      // the landing draws out tensely. Pacing only changes how fast we advance
-      // through the fixed-timestep sim across wall-clock frames — never which
-      // steps run or where the coin lands, so determinism is untouched.
-      let maxEnergy = 0;
-      for (const coin of this.coins) {
-        if (coin.world && !coin.settled) {
-          maxEnergy = Math.max(maxEnergy, coin.body.velocity.length() + coin.body.angularVelocity.length());
-        }
-      }
-      this._timeScale += (this.#scaleForEnergy(maxEnergy) - this._timeScale) * 0.1;
-      this._accum += (dtMs / 1000) * this._timeScale;
-      const budget = Math.min(8, Math.floor(this._accum / PHYS.dt));
+      // Advance the fixed-timestep sim at a steady, slightly-slowed pace. The
+      // step budget is capped so an unusually long frame can't freeze the view.
+      this._accum += (dtMs / 1000) * PACE;
+      let budget = Math.floor(this._accum / PHYS.dt);
       this._accum -= budget * PHYS.dt;
+      if (budget > 8) budget = 8;
 
       let allDone = true;
       for (const coin of this.coins) {
         if (!coin.world) continue;
         if (!coin.settled) {
+          let justSettled = false;
           for (let s = 0; s < budget; s++) {
             coin.world.step(PHYS.dt);
             coin.steps += 1;
-            if (isAtRest(coin.body)) {
-              if (++coin.quiet >= REST_FRAMES) break;
-            } else {
-              coin.quiet = 0;
+            if (settleStep(coin.settle, coin.body, coin.steps)) {
+              justSettled = true;
+              break;
             }
-            if (coin.steps >= PHYS.maxSteps) break;
           }
           this.#syncMesh(coin);
           // Debounced spark burst at the latest impact point.
@@ -179,7 +174,7 @@ export class CoinCinematic {
             }
             coin.spark = 0;
           }
-          if (coin.quiet >= REST_FRAMES || coin.steps >= PHYS.maxSteps) {
+          if (justSettled) {
             coin.settled = true;
             this.#beginAlign(coin);
             this.#spawnLanding(coin);
@@ -196,18 +191,6 @@ export class CoinCinematic {
         done();
       }
     }
-  }
-
-  // Map remaining kinetic energy to a playback speed: full-tilt while tumbling,
-  // deep slow-motion as a coin approaches rest.
-  #scaleForEnergy(energy) {
-    const hi = 12;
-    const lo = 2.0;
-    const fast = 0.85;
-    const slow = 0.22;
-    if (energy >= hi) return fast;
-    if (energy <= lo) return slow;
-    return slow + ((fast - slow) * (energy - lo)) / (hi - lo);
   }
 
   // --- Landing effects (verdict-themed) -----------------------------------
@@ -488,20 +471,27 @@ export class CoinCinematic {
 
   #buildFaceMaterial(scene, id, maps = {}, label, isGood) {
     const mat = new BABYLON.PBRMaterial(`glfc-${id}-mat`, scene);
-    mat.metallic = 1.0;
-    mat.roughness = 0.34;
-
+    // The scene has no environment/IBL map, and a fully-metallic PBR surface has
+    // no diffuse term — it renders almost black, hiding any uploaded art. Keep
+    // the faces semi-metallic dielectrics so the albedo, bump (normal map), and
+    // emission read true under the scene lights while still looking coin-like.
     if (maps.texture) {
       mat.albedoTexture = this.#safeTexture(scene, maps.texture);
+      mat.metallic = 0.35; // let the user's art read clearly
+      mat.roughness = 0.45;
     } else {
       mat.albedoTexture = this.#proceduralFace(scene, label, isGood);
-      mat.metallic = 0.92;
-      mat.roughness = 0.3;
+      mat.metallic = 0.55; // a bit more sheen for the default minted look
+      mat.roughness = 0.4;
     }
 
     if (maps.bump) {
       const bump = this.#safeTexture(scene, maps.bump);
-      if (bump) mat.bumpTexture = bump;
+      if (bump) {
+        mat.bumpTexture = bump;
+        mat.invertNormalMapX = false;
+        mat.invertNormalMapY = false;
+      }
     }
 
     if (maps.emissive) {
@@ -524,8 +514,8 @@ export class CoinCinematic {
 
   #buildEdgeMaterial(scene, maps = {}) {
     const mat = new BABYLON.PBRMaterial("glfc-edge-mat", scene);
-    mat.metallic = 1.0;
-    mat.roughness = 0.45;
+    mat.metallic = 0.55; // semi-metallic so the edge reads without an IBL map
+    mat.roughness = 0.5;
     if (maps?.texture) {
       mat.albedoTexture = this.#safeTexture(scene, maps.texture);
     } else {
@@ -632,7 +622,7 @@ export class CoinCinematic {
         coin.world = ctx.world;
         coin.body = buildBody(ctx, coin.spec);
         coin.settled = false;
-        coin.quiet = 0;
+        coin.settle = makeSettle();
         coin.steps = 0;
         coin.spark = 0;
         coin.lastSparkStep = -999;
@@ -643,7 +633,6 @@ export class CoinCinematic {
         });
         this.#syncMesh(coin);
       }
-      this._timeScale = 0.85;
       this._accum = 0;
       this._tossResolve = resolve;
       this._phase = "sim";
