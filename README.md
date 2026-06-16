@@ -4,7 +4,7 @@ Adds a configurable Destiny Fate Die to Foundry VTT PF2e checks, Hero Point rero
 
 ## Features
 
-- **Fate Coin (system-agnostic)** - A super-dramatic, full-screen 3D coin flip (powered by Babylon.js) for a **Boon / Bane** outcome. The GM stages the flip and either flips it themselves or hands it to a chosen player; the cinematic plays in sync on every connected client. Supports custom **texture, bump, and emission maps** per side, multi-coin flips with a configurable "Boons required" threshold, optional sound effects, and a per-client static fallback for reduced-motion / no-WebGL clients. See **[Fate Coin](#fate-coin)** below.
+- **Fate Coin (system-agnostic)** - A super-dramatic, full-screen coin flip with a **real rigid-body physics** toss (rendered with Babylon.js, simulated with cannon-es) for a **Boon / Bane** outcome — the coin is genuinely launched, tumbles, bounces, and settles. The GM stages the flip and either flips it themselves or hands it to a chosen player; the physics plays in sync on every connected client. Supports custom **texture, bump, and emission maps** per side, multi-coin flips with a configurable "Boons required" threshold, optional sound effects, and a per-client static fallback for reduced-motion / no-WebGL clients. See **[Fate Coin](#fate-coin)** below.
 - **PF2e fate die integration** - Adds the configured Destiny Dice result to supported PF2e checks.
 - **Hero Point reroll support** - Shows fate die outcomes on reroll workflows.
 - **Chat card results** - Displays Opportunity, Complication, blank results, and configured values in roll output, rendered in the GL Universe *Etched Glass* style — a frosted-glass result card with a chamfered corner, etched registration marks, and a precision-rule reveal sweep.
@@ -49,7 +49,7 @@ The Fate Coin is a standalone, **system-agnostic** ceremony — it works in any 
 3. The full-screen cinematic opens on **every** connected client at once. The chosen flipper sees a **Flip** button; everyone else sees a "waiting" prompt. The GM keeps a **force-flip** override in case the delegated player is away.
 4. The coins tumble and settle, a **Boon / Bane** verdict is revealed, and a chat card records the result. The GM clicks **Continue** to dismiss the overlay for everyone (with an automatic timeout as a safety net).
 
-The outcome is decided fairly and authoritatively **before** the animation (a fair 50/50 per coin), then choreographed identically on every screen, so all players always agree on the result.
+The outcome is decided fairly and authoritatively **before** the toss (a fair 50/50 per coin). The GM then *solves a real physics launch* that lands on that decided face and broadcasts the exact launch state; every client replays the same deterministic, fixed-timestep simulation, so all players see the same genuine tumble landing on the same — already agreed — result. (A tiny final alignment corrects any rare floating-point divergence between clients.)
 
 ### Macro / script API
 
@@ -132,8 +132,8 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ### Third-party
 
-The Fate Coin cinematic is powered by **[Babylon.js](https://www.babylonjs.com/)**, vendored at `scripts/vendor/babylon.js` under the Apache-2.0 license. See `scripts/vendor/babylon-LICENSE.md` and `scripts/vendor/babylon-NOTICE.md`.
+The Fate Coin cinematic is rendered with **[Babylon.js](https://www.babylonjs.com/)**, vendored at `scripts/vendor/babylon.js` under the Apache-2.0 license (see `scripts/vendor/babylon-LICENSE.md` and `scripts/vendor/babylon-NOTICE.md`), and the coin flip is simulated with **[cannon-es](https://github.com/pmndrs/cannon-es)**, vendored at `scripts/vendor/cannon-es.js` under the MIT license (see `scripts/vendor/cannon-es-LICENSE.md` and `scripts/vendor/cannon-es-NOTICE.md`).
 
 ## Credits
 
-Created by GLUniverse. 3D cinematic powered by Babylon.js.
+Created by GLUniverse. Fate Coin rendered with Babylon.js and simulated with cannon-es.

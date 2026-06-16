@@ -8,6 +8,7 @@ import {
 } from "./coin-constants.mjs";
 import { CoinCinematic, isCinematicSupported } from "./coin-cinematic.mjs";
 import { CoinStaticView } from "./coin-fallback.mjs";
+import { layoutX, solveThrow } from "./coin-physics.mjs";
 import { CoinOverlay } from "./coin-overlay.mjs";
 import { postCoinResult } from "./coin-result.mjs";
 import { getCoinLabels, getCoinMaterials, getCoinSounds } from "./coin-settings.mjs";
@@ -42,13 +43,15 @@ export async function beginCeremony({ count, threshold, flipperUserId } = {}) {
     return;
   }
 
-  // Authoritative, fair 50/50 per coin via a Foundry Roll (§Q5/Q8).
+  // Authoritative, fair 50/50 per coin via a Foundry Roll (§Q5/Q8). The GM then
+  // solves a real physics launch that lands on each coin's decided face and
+  // broadcasts that exact launch state, so every client replays the same tumble.
   const roll = await new Roll(`${safeCount}d2`).evaluate();
   const dieResults = roll.dice[0]?.results ?? [];
-  const coins = Array.from({ length: safeCount }, (_value, index) => ({
-    good: (dieResults[index]?.result ?? 1) === 2,
-    spins: 4 + Math.floor(Math.random() * 4), // choreography seed, shared by broadcast
-  }));
+  const coins = Array.from({ length: safeCount }, (_value, index) => {
+    const good = (dieResults[index]?.result ?? 1) === 2;
+    return { good, throw: solveThrow(layoutX(index, safeCount), good) };
+  });
 
   const payload = {
     id: foundry.utils.randomID(),
