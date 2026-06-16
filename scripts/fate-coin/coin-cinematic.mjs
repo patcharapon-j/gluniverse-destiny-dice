@@ -44,6 +44,8 @@ export class CoinCinematic {
     this._clock = 0;
     this._timeScale = 0.85; // cinematic pacing, eased toward slow-mo near landing
     this._accum = 0;
+    this._ripples = []; // expanding surface shockwaves spawned on landing
+    this._rippleTex = null;
     this._tossResolve = null;
     this._onResize = () => this.engine?.resize();
   }
@@ -123,6 +125,7 @@ export class CoinCinematic {
   #onFrame() {
     const dtMs = this.engine?.getDeltaTime?.() ?? 16.7;
     this._clock += dtMs;
+    this.#updateRipples(dtMs);
 
     if (this._phase === "idle") {
       // Coins hover and turn slowly while awaiting the flip.
@@ -170,6 +173,7 @@ export class CoinCinematic {
           if (coin.quiet >= REST_FRAMES || coin.steps >= PHYS.maxSteps) {
             coin.settled = true;
             this.#beginAlign(coin);
+            this.#spawnRipple(coin);
           } else {
             allDone = false;
           }
@@ -195,6 +199,96 @@ export class CoinCinematic {
     if (energy >= hi) return fast;
     if (energy <= lo) return slow;
     return slow + ((fast - slow) * (energy - lo)) / (hi - lo);
+  }
+
+  // --- Surface ripple -----------------------------------------------------
+
+  // A soft white annulus on black; under additive blending the black adds
+  // nothing, so only a glowing ring shows — tinted per verdict via emissiveColor.
+  #rippleTexture() {
+    if (this._rippleTex) return this._rippleTex;
+    const size = 256;
+    const tex = new BABYLON.DynamicTexture("glfc-ripple-tex", size, this.scene, false);
+    const ctx = tex.getContext();
+    const c = size / 2;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, size, size);
+    const g = ctx.createRadialGradient(c, c, 0, c, c, c);
+    g.addColorStop(0.0, "#000");
+    g.addColorStop(0.5, "#000");
+    g.addColorStop(0.66, "#ffffff");
+    g.addColorStop(0.82, "#000");
+    g.addColorStop(1.0, "#000");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.update(false);
+    this._rippleTex = tex;
+    return tex;
+  }
+
+  // Spawn a short burst of concentric shockwaves from a settled coin.
+  #spawnRipple(coin) {
+    if (!this.scene) return;
+    const tint = coin.target
+      ? new BABYLON.Color3(1.0, 0.8, 0.32) // Boon — warm gold
+      : new BABYLON.Color3(0.95, 0.2, 0.16); // Bane — deep red
+    const x = coin.body?.position.x ?? coin.phaseX;
+    const z = coin.body?.position.z ?? coin.phaseZ;
+    const tex = this.#rippleTexture();
+
+    for (let i = 0; i < 3; i++) {
+      const mat = new BABYLON.StandardMaterial(`glfc-ripple-mat-${this._clock}-${i}`, this.scene);
+      mat.disableLighting = true;
+      mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+      mat.specularColor = new BABYLON.Color3(0, 0, 0);
+      mat.emissiveColor = tint;
+      mat.emissiveTexture = tex;
+      mat.alphaMode = BABYLON.Engine.ALPHA_ADD;
+      mat.disableDepthWrite = true;
+      mat.backFaceCulling = false;
+
+      const mesh = BABYLON.MeshBuilder.CreateGround(`glfc-ripple-${this._clock}-${i}`, { width: 1, height: 1 }, this.scene);
+      mesh.material = mat;
+      mesh.position.set(x, 0.015 + i * 0.004, z);
+      mesh.isPickable = false;
+
+      this._ripples.push({
+        mesh,
+        mat,
+        age: 0,
+        delay: i * 150,
+        life: 1150,
+        startScale: 1.8,
+        endScale: 13 - i * 1.5,
+        baseAlpha: 0.9 - i * 0.18,
+      });
+    }
+  }
+
+  #updateRipples(dtMs) {
+    if (!this._ripples.length) return;
+    const survivors = [];
+    for (const r of this._ripples) {
+      r.age += dtMs;
+      if (r.age < r.delay) {
+        r.mesh.scaling.set(r.startScale, 1, r.startScale);
+        r.mat.alpha = 0;
+        survivors.push(r);
+        continue;
+      }
+      const t = Math.min(1, (r.age - r.delay) / r.life);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const scale = r.startScale + (r.endScale - r.startScale) * eased;
+      r.mesh.scaling.set(scale, 1, scale);
+      r.mat.alpha = r.baseAlpha * (1 - t);
+      if (t >= 1) {
+        try { r.mesh.dispose(); } catch {}
+        try { r.mat.dispose(); } catch {}
+      } else {
+        survivors.push(r);
+      }
+    }
+    this._ripples = survivors;
   }
 
   #syncMesh(coin) {
@@ -415,5 +509,7 @@ export class CoinCinematic {
     this.scene = null;
     this.engine = null;
     this.coins = [];
+    this._ripples = [];
+    this._rippleTex = null;
   }
 }
