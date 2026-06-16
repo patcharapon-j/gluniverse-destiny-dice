@@ -3,12 +3,14 @@ import { registerDiceSoNice } from "./dsn.mjs";
 import { registerFateRendering } from "./fate-result.mjs";
 import { registerPF2eIntegration } from "./pf2e-integration.mjs";
 import { applyMotionTier, applyThemeFromSettings, migrateLegacySettings, registerSettings } from "./settings.mjs";
+import { registerFateCoin } from "./fate-coin/index.mjs";
 
 Hooks.once("init", () => {
   registerSettings();
   registerFateDie();
   registerFateRendering();
   registerPF2eIntegration();
+  registerFateCoin();
 });
 
 Hooks.once("ready", async () => {
