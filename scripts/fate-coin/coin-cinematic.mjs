@@ -170,10 +170,18 @@ export class CoinCinematic {
             if (coin.steps >= PHYS.maxSteps) break;
           }
           this.#syncMesh(coin);
+          // Debounced spark burst at the latest impact point.
+          if (coin.spark > 0) {
+            if (coin.steps - coin.lastSparkStep > 8) {
+              this.#spawnSparks(coin);
+              coin.lastSparkStep = coin.steps;
+            }
+            coin.spark = 0;
+          }
           if (coin.quiet >= REST_FRAMES || coin.steps >= PHYS.maxSteps) {
             coin.settled = true;
             this.#beginAlign(coin);
-            this.#spawnRipple(coin);
+            this.#spawnLanding(coin);
           } else {
             allDone = false;
           }
@@ -201,66 +209,159 @@ export class CoinCinematic {
     return slow + ((fast - slow) * (energy - lo)) / (hi - lo);
   }
 
-  // --- Surface ripple -----------------------------------------------------
+  // --- Landing effects (verdict-themed) -----------------------------------
 
-  // A soft white annulus on black; under additive blending the black adds
-  // nothing, so only a glowing ring shows — tinted per verdict via emissiveColor.
-  #rippleTexture() {
-    if (this._rippleTex) return this._rippleTex;
+  #verdictTint(isGood) {
+    return isGood
+      ? new BABYLON.Color3(1.0, 0.82, 0.34) // Boon — warm gold
+      : new BABYLON.Color3(0.96, 0.22, 0.16); // Bane — deep red
+  }
+
+  // Soft glowing annulus (a pulse ring), drawn white on black for additive use.
+  #ringTexture() {
+    if (this._ringTex) return this._ringTex;
     const size = 256;
-    const tex = new BABYLON.DynamicTexture("glfc-ripple-tex", size, this.scene, false);
+    const tex = new BABYLON.DynamicTexture("glfc-ring-tex", size, this.scene, false);
     const ctx = tex.getContext();
     const c = size / 2;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, size, size);
     const g = ctx.createRadialGradient(c, c, 0, c, c, c);
     g.addColorStop(0.0, "#000");
-    g.addColorStop(0.5, "#000");
-    g.addColorStop(0.66, "#ffffff");
-    g.addColorStop(0.82, "#000");
+    g.addColorStop(0.48, "#000");
+    g.addColorStop(0.62, "#ffffff");
+    g.addColorStop(0.78, "#000");
     g.addColorStop(1.0, "#000");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
     tex.update(false);
-    this._rippleTex = tex;
+    this._ringTex = tex;
     return tex;
   }
 
-  // Spawn a short burst of concentric shockwaves from a settled coin.
-  #spawnRipple(coin) {
+  // Soft filled radial flash (bright core fading out) for the impact bloom.
+  #glowTexture() {
+    if (this._glowTex) return this._glowTex;
+    const size = 256;
+    const tex = new BABYLON.DynamicTexture("glfc-glow-tex", size, this.scene, false);
+    const ctx = tex.getContext();
+    const c = size / 2;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, size, size);
+    const g = ctx.createRadialGradient(c, c, 0, c, c, c);
+    g.addColorStop(0.0, "#ffffff");
+    g.addColorStop(0.25, "#bbbbbb");
+    g.addColorStop(0.6, "#222222");
+    g.addColorStop(1.0, "#000000");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.update(false);
+    this._glowTex = tex;
+    return tex;
+  }
+
+  // Jagged radial fractures (white core + warm glow) for the Bane landing.
+  #crackTexture() {
+    if (this._crackTex) return this._crackTex;
+    const size = 512;
+    const tex = new BABYLON.DynamicTexture("glfc-crack-tex", size, this.scene, false);
+    const ctx = tex.getContext();
+    const c = size / 2;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, size, size);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const drawCrack = (x, y, ang, length, depth) => {
+      const segs = 6;
+      const seg = length / segs;
+      const pts = [[x, y]];
+      const branches = [];
+      let px = x;
+      let py = y;
+      let a = ang;
+      for (let i = 0; i < segs; i++) {
+        a += (Math.random() - 0.5) * 0.5;
+        px += Math.cos(a) * seg;
+        py += Math.sin(a) * seg;
+        pts.push([px, py]);
+        if (depth < 2 && Math.random() < 0.4) {
+          const da = (Math.random() < 0.5 ? 1 : -1) * (0.6 + Math.random() * 0.5);
+          branches.push([px, py, a + da, length * (1 - (i + 1) / segs) * 0.7, depth + 1]);
+        }
+      }
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      const w = Math.max(1.5, 5 - depth * 1.6);
+      ctx.strokeStyle = "rgba(255,130,90,0.45)";
+      ctx.lineWidth = w + 5;
+      ctx.stroke();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = w;
+      ctx.stroke();
+      for (const b of branches) drawCrack(b[0], b[1], b[2], b[3], b[4]);
+    };
+
+    const mains = 9;
+    for (let k = 0; k < mains; k++) {
+      const ang = (k / mains) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      drawCrack(c, c, ang, c * 0.9, 0);
+    }
+    tex.update(false);
+    this._crackTex = tex;
+    return tex;
+  }
+
+  // A flat, additive, circular decal on the ground that scales + fades.
+  #pushDecal(tex, tint, x, z, layer, params) {
+    const mat = new BABYLON.StandardMaterial(`glfc-decal-mat-${this._clock}-${layer}`, this.scene);
+    mat.disableLighting = true;
+    mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+    mat.specularColor = new BABYLON.Color3(0, 0, 0);
+    mat.emissiveColor = tint;
+    mat.emissiveTexture = tex;
+    mat.alphaMode = BABYLON.Engine.ALPHA_ADD;
+    mat.disableDepthWrite = true;
+    mat.backFaceCulling = false;
+
+    const mesh = BABYLON.MeshBuilder.CreateDisc(`glfc-decal-${this._clock}-${layer}`, { radius: 0.5, tessellation: 64 }, this.scene);
+    mesh.rotation.x = -Math.PI / 2; // lie flat, facing up
+    mesh.position.set(x, 0.02 + layer * 0.004, z);
+    mesh.isPickable = false;
+    mesh.material = mat;
+
+    this._ripples.push({ mesh, mat, age: 0, ...params });
+  }
+
+  // Verdict-themed landing flourish: a radiant gold pulse for a Boon, spreading
+  // red fractures for a Bane. Snappy expand, then fade.
+  #spawnLanding(coin) {
     if (!this.scene) return;
-    const tint = coin.target
-      ? new BABYLON.Color3(1.0, 0.8, 0.32) // Boon — warm gold
-      : new BABYLON.Color3(0.95, 0.2, 0.16); // Bane — deep red
+    const tint = this.#verdictTint(coin.target);
     const x = coin.body?.position.x ?? coin.phaseX;
     const z = coin.body?.position.z ?? coin.phaseZ;
-    const tex = this.#rippleTexture();
 
-    for (let i = 0; i < 3; i++) {
-      const mat = new BABYLON.StandardMaterial(`glfc-ripple-mat-${this._clock}-${i}`, this.scene);
-      mat.disableLighting = true;
-      mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      mat.specularColor = new BABYLON.Color3(0, 0, 0);
-      mat.emissiveColor = tint;
-      mat.emissiveTexture = tex;
-      mat.alphaMode = BABYLON.Engine.ALPHA_ADD;
-      mat.disableDepthWrite = true;
-      mat.backFaceCulling = false;
+    // Shared bright impact bloom.
+    this.#pushDecal(this.#glowTexture(), tint, x, z, 0, {
+      delay: 0, growMs: 200, life: 420, fadeStart: 0, startScale: 0.6, endScale: coin.target ? 4.5 : 3.6, baseAlpha: 1.0,
+    });
 
-      const mesh = BABYLON.MeshBuilder.CreateGround(`glfc-ripple-${this._clock}-${i}`, { width: 1, height: 1 }, this.scene);
-      mesh.material = mat;
-      mesh.position.set(x, 0.015 + i * 0.004, z);
-      mesh.isPickable = false;
-
-      this._ripples.push({
-        mesh,
-        mat,
-        age: 0,
-        delay: i * 150,
-        life: 1150,
-        startScale: 1.8,
-        endScale: 13 - i * 1.5,
-        baseAlpha: 0.9 - i * 0.18,
+    if (coin.target) {
+      // Boon: two luminous pulse rings rippling outward.
+      this.#pushDecal(this.#ringTexture(), tint, x, z, 1, {
+        delay: 0, growMs: 360, life: 720, fadeStart: 110, startScale: 1.6, endScale: 11, baseAlpha: 0.95,
+      });
+      this.#pushDecal(this.#ringTexture(), tint, x, z, 2, {
+        delay: 120, growMs: 420, life: 760, fadeStart: 130, startScale: 1.4, endScale: 8, baseAlpha: 0.7,
+      });
+    } else {
+      // Bane: fractures snap outward, with a quick shock ring.
+      this.#pushDecal(this.#crackTexture(), tint, x, z, 1, {
+        delay: 40, growMs: 280, life: 980, fadeStart: 380, startScale: 0.4, endScale: 9, baseAlpha: 1.0,
+      });
+      this.#pushDecal(this.#ringTexture(), tint, x, z, 2, {
+        delay: 0, growMs: 300, life: 560, fadeStart: 80, startScale: 1.4, endScale: 7, baseAlpha: 0.8,
       });
     }
   }
@@ -270,18 +371,19 @@ export class CoinCinematic {
     const survivors = [];
     for (const r of this._ripples) {
       r.age += dtMs;
-      if (r.age < r.delay) {
-        r.mesh.scaling.set(r.startScale, 1, r.startScale);
+      const local = r.age - r.delay;
+      if (local < 0) {
+        r.mesh.scaling.set(r.startScale, r.startScale, r.startScale);
         r.mat.alpha = 0;
         survivors.push(r);
         continue;
       }
-      const t = Math.min(1, (r.age - r.delay) / r.life);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const scale = r.startScale + (r.endScale - r.startScale) * eased;
-      r.mesh.scaling.set(scale, 1, scale);
-      r.mat.alpha = r.baseAlpha * (1 - t);
-      if (t >= 1) {
+      const g = Math.min(1, local / r.growMs);
+      const scale = r.startScale + (r.endScale - r.startScale) * this.#easeOut(g);
+      r.mesh.scaling.set(scale, scale, scale);
+      const fade = local <= r.fadeStart ? 1 : 1 - (local - r.fadeStart) / (r.life - r.fadeStart);
+      r.mat.alpha = r.baseAlpha * Math.max(0, fade);
+      if (local >= r.life) {
         try { r.mesh.dispose(); } catch {}
         try { r.mat.dispose(); } catch {}
       } else {
@@ -289,6 +391,62 @@ export class CoinCinematic {
       }
     }
     this._ripples = survivors;
+  }
+
+  // --- Impact sparks ------------------------------------------------------
+
+  #dotTexture() {
+    if (this._dotTex) return this._dotTex;
+    const size = 64;
+    const tex = new BABYLON.DynamicTexture("glfc-dot-tex", size, this.scene, true);
+    const ctx = tex.getContext();
+    const c = size / 2;
+    ctx.clearRect(0, 0, size, size);
+    const g = ctx.createRadialGradient(c, c, 0, c, c, c);
+    g.addColorStop(0.0, "rgba(255,255,255,1)");
+    g.addColorStop(0.4, "rgba(255,255,255,0.85)");
+    g.addColorStop(1.0, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    tex.hasAlpha = true;
+    tex.update(true);
+    this._dotTex = tex;
+    return tex;
+  }
+
+  // One-shot additive spark burst at a coin's current impact point.
+  #spawnSparks(coin) {
+    if (!this.scene) return;
+    const strength = coin.spark;
+    const tint = this.#verdictTint(coin.target);
+    const p = coin.body.position;
+    const count = Math.max(6, Math.min(26, Math.round(strength * 2.2)));
+
+    const ps = new BABYLON.ParticleSystem(`glfc-spark-${this._clock}`, 48, this.scene);
+    ps.particleTexture = this.#dotTexture();
+    ps.emitter = new BABYLON.Vector3(p.x, Math.max(p.y, 0.06), p.z);
+    ps.minEmitBox = new BABYLON.Vector3(-0.05, 0, -0.05);
+    ps.maxEmitBox = new BABYLON.Vector3(0.05, 0.05, 0.05);
+    ps.color1 = new BABYLON.Color4(1, 1, 1, 1);
+    ps.color2 = new BABYLON.Color4(tint.r, tint.g, tint.b, 1);
+    ps.colorDead = new BABYLON.Color4(tint.r, tint.g, tint.b, 0);
+    ps.minSize = 0.05;
+    ps.maxSize = 0.17;
+    ps.minLifeTime = 0.18;
+    ps.maxLifeTime = 0.44;
+    ps.emitRate = 0;
+    ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
+    ps.gravity = new BABYLON.Vector3(0, -34, 0);
+    ps.direction1 = new BABYLON.Vector3(-1.3, 1.4, -1.3);
+    ps.direction2 = new BABYLON.Vector3(1.3, 3.0, 1.3);
+    ps.minEmitPower = 3;
+    ps.maxEmitPower = 7.5;
+    ps.updateSpeed = 0.016;
+    ps.manualEmitCount = count;
+    ps.start();
+    window.setTimeout(() => {
+      try { ps.dispose(); } catch {}
+    }, 700);
   }
 
   #syncMesh(coin) {
@@ -468,12 +626,19 @@ export class CoinCinematic {
         return;
       }
       for (const coin of this.coins) {
-        const ctx = buildWorld();
+        const ctx = buildWorld(coin.spec.cx ?? 0);
         coin.world = ctx.world;
         coin.body = buildBody(ctx, coin.spec);
         coin.settled = false;
         coin.quiet = 0;
         coin.steps = 0;
+        coin.spark = 0;
+        coin.lastSparkStep = -999;
+        // Throw a spark burst on every solid impact (render-only feedback).
+        coin.body.addEventListener("collide", (e) => {
+          const v = Math.abs(e.contact?.getImpactVelocityAlongNormal?.() ?? 0);
+          if (v > 2) coin.spark = Math.max(coin.spark, v);
+        });
         this.#syncMesh(coin);
       }
       this._timeScale = 0.85;
@@ -510,6 +675,9 @@ export class CoinCinematic {
     this.engine = null;
     this.coins = [];
     this._ripples = [];
-    this._rippleTex = null;
+    this._ringTex = null;
+    this._glowTex = null;
+    this._crackTex = null;
+    this._dotTex = null;
   }
 }

@@ -18,23 +18,29 @@ export const PHYS = {
   // these steps each frame (paced for cinematic effect), so the outcome is
   // independent of a client's display framerate.
   dt: 1 / 120,
-  maxSteps: 1400, // hard cap (~11.6s of sim) before we force a settle
+  maxSteps: 2200, // hard cap before we force a settle
 
   radius: 1.0,
   thickness: 0.16,
   mass: 1,
-  restitution: 0.4,
-  friction: 0.45,
+  restitution: 0.66, // bouncy — many lively impacts before it settles
+  friction: 0.2, // low, so spin doesn't skitter the coin off-screen
   gravity: 14, // floaty, for a long, tense hang time
 
   // Launch envelope. Coins start hovering at PRESENT_Y, then are thrown upward
   // with a strong horizontal-axis spin so they flip like a tossed coin. A high,
-  // slow arc (low gravity) gives the flip room to breathe.
+  // slow arc (low gravity) gives the flip room to breathe. Horizontal velocity
+  // is deliberately tiny so the coin bounces in place rather than flying away.
   presentY: 5.0,
-  upMin: 9.5,
-  upMax: 12.0,
+  upMin: 9.0,
+  upMax: 11.0,
   spinMin: 13,
   spinMax: 24,
+
+  // Invisible containment box (per coin) so an energetic bounce can never leave
+  // the frame. Applied identically in the solve and the replay.
+  wallR: 4.5,
+  wallH: 16,
 
   // Side-by-side layout spacing for multi-coin flips.
   spacing: 2.7,
@@ -53,8 +59,9 @@ export function layoutX(index, count) {
 }
 
 // One isolated world per coin: independent simulations cannot interfere, which
-// keeps every coin's outcome reproducible on its own.
-export function buildWorld() {
+// keeps every coin's outcome reproducible on its own. `centerX` positions the
+// floor/containment box around the coin's lane and MUST match in solve & replay.
+export function buildWorld(centerX = 0) {
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -PHYS.gravity, 0) });
   world.broadphase = new CANNON.NaiveBroadphase();
   world.allowSleep = false;
@@ -73,13 +80,37 @@ export function buildWorld() {
   ground.quaternion.setFromEuler(-Math.PI / 2, 0, 0); // normal points +Y
   world.addBody(ground);
 
+  // Four invisible walls boxing the coin in (lower restitution so they nudge
+  // rather than fling it back).
+  const wallMat = new CANNON.Material("glfc-wall");
+  world.addContactMaterial(
+    new CANNON.ContactMaterial(coinMat, wallMat, { restitution: 0.2, friction: 0.1 }),
+  );
+  const r = PHYS.wallR;
+  const h = PHYS.wallH;
+  const walls = [
+    { pos: [centerX + r, h / 2, 0], half: [0.5, h / 2, r + 1] },
+    { pos: [centerX - r, h / 2, 0], half: [0.5, h / 2, r + 1] },
+    { pos: [centerX, h / 2, r], half: [r + 1, h / 2, 0.5] },
+    { pos: [centerX, h / 2, -r], half: [r + 1, h / 2, 0.5] },
+  ];
+  for (const w of walls) {
+    const body = new CANNON.Body({
+      mass: 0,
+      shape: new CANNON.Box(new CANNON.Vec3(w.half[0], w.half[1], w.half[2])),
+      material: wallMat,
+    });
+    body.position.set(w.pos[0], w.pos[1], w.pos[2]);
+    world.addBody(body);
+  }
+
   return { world, coinMat };
 }
 
 export function buildBody(ctx, throwSpec) {
   const shape = new CANNON.Cylinder(PHYS.radius, PHYS.radius, PHYS.thickness, 36);
   const body = new CANNON.Body({ mass: PHYS.mass, shape, material: ctx.coinMat });
-  body.angularDamping = 0.08;
+  body.angularDamping = 0.11; // bleed off flat spins so it doesn't twirl forever
   body.linearDamping = 0.01;
   ctx.world.addBody(body);
   if (throwSpec) applyThrow(body, throwSpec);
@@ -118,6 +149,7 @@ export function isAtRest(body) {
 function randomThrow(x, rand, scratch) {
   scratch.setFromEuler((rand() - 0.5) * 0.6, rand() * Math.PI * 2, (rand() - 0.5) * 0.6);
   return {
+    cx: x, // lane center — replay must rebuild the world around the same point
     px: x + (rand() - 0.5) * 0.3,
     py: PHYS.presentY,
     pz: (rand() - 0.5) * 0.3,
@@ -125,12 +157,12 @@ function randomThrow(x, rand, scratch) {
     qy: scratch.y,
     qz: scratch.z,
     qw: scratch.w,
-    vx: (rand() - 0.5) * 1.4,
+    vx: (rand() - 0.5) * 0.6,
     vy: PHYS.upMin + rand() * (PHYS.upMax - PHYS.upMin),
-    vz: (rand() - 0.5) * 1.4,
+    vz: (rand() - 0.5) * 0.6,
     ax: (PHYS.spinMin + rand() * (PHYS.spinMax - PHYS.spinMin)) * (rand() < 0.5 ? -1 : 1),
-    ay: (rand() - 0.5) * 5,
-    az: (rand() - 0.5) * 5,
+    ay: (rand() - 0.5) * 4,
+    az: (rand() - 0.5) * 4,
   };
 }
 
@@ -141,7 +173,7 @@ function randomThrow(x, rand, scratch) {
 export function solveThrow(x, targetGood, rand = Math.random) {
   let last = null;
   for (let attempt = 0; attempt < 80; attempt++) {
-    const ctx = buildWorld();
+    const ctx = buildWorld(x);
     const scratch = new CANNON.Quaternion();
     const spec = randomThrow(x, rand, scratch);
     const body = buildBody(ctx, spec);
