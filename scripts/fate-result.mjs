@@ -50,7 +50,7 @@ export async function applyFateToMessage(message, { source = "manual" } = {}) {
     // A non-zero fate bonus is added to the check's final result as an untyped
     // bonus (the result is whatever this physical face is worth). Faces worth 0
     // — or a missing/null bonus — leave the roll untouched.
-    const bonusUpdate = await applyFateBonusToCheckRoll(message, fate.bonus);
+    const bonusUpdate = await applyFateBonusToCheckRoll(message, fate.bonus, getKindLabel(fate.kind));
     if (bonusUpdate) {
       updates.rolls = bonusUpdate.rolls;
       if (bonusUpdate.outcome) updates["flags.pf2e.context.outcome"] = bonusUpdate.outcome;
@@ -102,7 +102,7 @@ const DEGREE_OUTCOMES = ["criticalFailure", "failure", "success", "criticalSucce
 // bonus is only applied for non-zero, finite values, and never twice for the
 // same roll. Returns the serialized roll data plus any outcome changes, or null
 // when nothing was applied (so the caller can skip the roll update entirely).
-async function applyFateBonusToCheckRoll(message, bonus) {
+async function applyFateBonusToCheckRoll(message, bonus, label) {
   if (!Number.isFinite(bonus) || bonus === 0) return null;
 
   const roll = message?.rolls?.at?.(0);
@@ -110,9 +110,9 @@ async function applyFateBonusToCheckRoll(message, bonus) {
 
   try {
     const terms = foundry.dice.terms;
-    const label = game.i18n.localize("GLDDF.Roll.FateBonusLabel");
+    const flavor = label || game.i18n.localize("GLDDF.Roll.FateBonusLabel");
     const operator = new terms.OperatorTerm({ operator: bonus >= 0 ? "+" : "-" });
-    const numeric = new terms.NumericTerm({ number: Math.abs(bonus), options: { flavor: label } });
+    const numeric = new terms.NumericTerm({ number: Math.abs(bonus), options: { flavor } });
     if (!operator._evaluated) await operator.evaluate();
     if (!numeric._evaluated) await numeric.evaluate();
 
