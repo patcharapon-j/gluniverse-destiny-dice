@@ -46,6 +46,18 @@ export async function applyFateToMessage(message, { source = "manual" } = {}) {
     };
 
     const updates = { [`flags.${MODULE_ID}.${FLAGS.fate}`]: fate };
+
+    // A non-zero fate bonus is added to the check's final result as an untyped
+    // bonus (the result is whatever this physical face is worth). Faces worth 0
+    // — or a missing/null bonus — leave the roll untouched.
+    const bonusUpdate = await applyFateBonusToCheckRoll(message, fate.bonus, getKindLabel(fate.kind));
+    if (bonusUpdate) {
+      updates.rolls = bonusUpdate.rolls;
+      if (bonusUpdate.outcome) updates["flags.pf2e.context.outcome"] = bonusUpdate.outcome;
+      if (bonusUpdate.unadjustedOutcome) updates["flags.pf2e.context.unadjustedOutcome"] = bonusUpdate.unadjustedOutcome;
+      fate.bonusApplied = true;
+    }
+
     const cleanedContent = (message.content ?? "").replace(FATE_STRIP_PATTERN, "");
     if (cleanedContent !== message.content) updates.content = cleanedContent;
     await message.update(updates);
@@ -80,6 +92,80 @@ function getFaceResult(roll) {
   if (!Number.isInteger(value)) return null;
   const face = getFateFace(value);
   return face ? { value, ...face } : null;
+}
+
+// PF2e degree-of-success ordering: index === degree value (0 = worst).
+const DEGREE_OUTCOMES = ["criticalFailure", "failure", "success", "criticalSuccess"];
+
+// Adds the fate bonus to the message's primary check roll as a labeled, untyped
+// numeric term and re-derives the degree of success against the check DC. The
+// bonus is only applied for non-zero, finite values, and never twice for the
+// same roll. Returns the serialized roll data plus any outcome changes, or null
+// when nothing was applied (so the caller can skip the roll update entirely).
+async function applyFateBonusToCheckRoll(message, bonus, label) {
+  if (!Number.isFinite(bonus) || bonus === 0) return null;
+
+  const roll = message?.rolls?.at?.(0);
+  if (!roll || roll.options?.glddfFateBonusApplied) return null;
+
+  try {
+    const terms = foundry.dice.terms;
+    const flavor = label || game.i18n.localize("GLDDF.Roll.FateBonusLabel");
+    const operator = new terms.OperatorTerm({ operator: bonus >= 0 ? "+" : "-" });
+    const numeric = new terms.NumericTerm({ number: Math.abs(bonus), options: { flavor } });
+    if (!operator._evaluated) await operator.evaluate();
+    if (!numeric._evaluated) await numeric.evaluate();
+
+    roll.terms.push(operator, numeric);
+    roll._total = Number(roll._total ?? roll.total ?? 0) + bonus;
+    roll.options = roll.options ?? {};
+    roll.options.glddfFateBonusApplied = true;
+    roll.options.glddfFateBonus = bonus;
+    if (typeof roll.resetFormula === "function") roll.resetFormula();
+
+    const result = {};
+
+    // Only checks rolled against a DC have a degree of success to re-derive.
+    const context = message.flags?.pf2e?.context;
+    const dc = Number(context?.dc?.value);
+    const dieResult = getD20Result(roll);
+    if (Number.isInteger(dc) && Number.isInteger(dieResult)) {
+      const unadjusted = baseDegree(roll._total, dc);
+      const adjusted = adjustDegreeForNatural(unadjusted, dieResult);
+      roll.options.degreeOfSuccess = adjusted;
+      result.outcome = DEGREE_OUTCOMES[adjusted];
+      result.unadjustedOutcome = DEGREE_OUTCOMES[unadjusted];
+    }
+
+    result.rolls = message.rolls.map((r) => r.toJSON());
+    return result;
+  } catch (error) {
+    console.error("GLUniverse Destiny Dice | Failed to add Fate Die bonus to check roll", error);
+    return null;
+  }
+}
+
+function getD20Result(roll) {
+  const die = roll.dice?.find((d) => d.faces === 20);
+  const active = die?.results?.find((r) => r.active !== false && !r.discarded);
+  return Number.isInteger(active?.result) ? active.result : (Number.isInteger(die?.total) ? die.total : null);
+}
+
+// PF2e: beat the DC by 10+ → critical success, meet/beat → success, miss by
+// 10+ → critical failure, otherwise failure.
+function baseDegree(total, dc) {
+  const delta = total - dc;
+  if (delta >= 10) return 3;
+  if (delta >= 0) return 2;
+  if (delta <= -10) return 0;
+  return 1;
+}
+
+// A natural 20 shifts the result up one step; a natural 1 shifts it down one.
+function adjustDegreeForNatural(degree, dieResult) {
+  if (dieResult === 20) return Math.min(3, degree + 1);
+  if (dieResult === 1) return Math.max(0, degree - 1);
+  return degree;
 }
 
 // A freshly-applied fate plays the reveal-contract ceremony (§6.3); re-renders
