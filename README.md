@@ -4,7 +4,7 @@ Adds a configurable Destiny Fate Die to Foundry VTT PF2e checks, Hero Point rero
 
 ## Features
 
-- **PF2e fate die integration** - Adds the configured Destiny Dice result to supported PF2e checks.
+- **PF2e fate die integration** - Adds the configured Destiny Dice result to supported PF2e checks. When a face carries a numeric value (e.g. +2 / +4), that value is applied to the check's final result as a labeled untyped bonus and the degree of success is re-derived against the DC. Faces worth 0 leave the roll untouched.
 - **Hero Point reroll support** - Shows fate die outcomes on reroll workflows.
 - **Chat card results** - Displays Opportunity, Complication, blank results, and configured values in roll output, rendered in the GL Universe *Etched Glass* style — a frosted-glass result card with a chamfered corner, etched registration marks, and a precision-rule reveal sweep.
 - **Dice So Nice textures** - Supplies label, bump, and emissive maps for the fate die faces.
